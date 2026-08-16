@@ -1,0 +1,28 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // MVP sin autenticación: acceso abierto de lectura/escritura a la
+    // colección "tasks" para que el equipo de interventoría pueda usar la
+    // app sin login. Esto es intencional para esta fase y debe cerrarse
+    // antes de manejar datos sensibles o exponer el proyecto públicamente.
+    match /tasks/{taskId} {
+      allow read, write: if true;
+    }
+
+    // Cualquier otra colección queda cerrada por defecto.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- Fase 2: Firebase Auth (multi-usuario / multi-interventor) ---
+    // Cuando se habilite Firebase Auth, reemplazar la regla de "tasks" por
+    // algo como lo siguiente (ejemplo: cualquier usuario autenticado puede
+    // leer/escribir; se puede refinar por rol o por proyecto más adelante):
+    //
+    // match /tasks/{taskId} {
+    //   allow read, write: if request.auth != null;
+    // }
+  }
+}
