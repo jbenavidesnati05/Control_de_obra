@@ -1,16 +1,12 @@
 "use client";
 
-import { useState } from "react";
 import { useDraggable } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
 import { AlertTriangle, CalendarDays, Repeat, Trash2, User } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { toast } from "sonner";
 import DisciplinaChip from "@/components/tasks/DisciplinaChip";
-import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import { disciplinaInfo } from "@/lib/disciplinas";
-import { deleteTask } from "@/lib/tasks";
 import { isPast, cn } from "@/lib/utils";
 import { RECURRENCIA_LABEL_CORTO } from "@/lib/recurrencia";
 import { ESTADOS_FINALES, type Task } from "@/lib/types";
@@ -18,13 +14,13 @@ import { ESTADOS_FINALES, type Task } from "@/lib/types";
 interface Props {
   task: Task;
   onClick: () => void;
+  onRequestDelete: () => void;
 }
 
-export default function KanbanCard({ task, onClick }: Props) {
+export default function KanbanCard({ task, onClick, onRequestDelete }: Props) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: task.id,
   });
-  const [confirmingDelete, setConfirmingDelete] = useState(false);
   const info = disciplinaInfo(task.disciplina);
   const vencida = task.fecha && !ESTADOS_FINALES.includes(task.estado) && isPast(task.fecha);
 
@@ -32,16 +28,6 @@ export default function KanbanCard({ task, onClick }: Props) {
     transform: CSS.Translate.toString(transform),
     borderLeftColor: info.color,
   };
-
-  async function handleDelete() {
-    setConfirmingDelete(false);
-    try {
-      await deleteTask(task.id);
-      toast.success("Tarea eliminada.");
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "No se pudo eliminar la tarea.");
-    }
-  }
 
   return (
     <div
@@ -59,7 +45,7 @@ export default function KanbanCard({ task, onClick }: Props) {
         type="button"
         onClick={(e) => {
           e.stopPropagation();
-          setConfirmingDelete(true);
+          onRequestDelete();
         }}
         onPointerDown={(e) => e.stopPropagation()}
         aria-label="Eliminar tarea"
@@ -105,19 +91,6 @@ export default function KanbanCard({ task, onClick }: Props) {
           </span>
         )}
       </div>
-
-      {confirmingDelete && (
-        <div onClick={(e) => e.stopPropagation()}>
-          <ConfirmDialog
-            title="Eliminar tarea"
-            message={`¿Eliminar "${task.titulo}"? Esta acción no se puede deshacer.`}
-            confirmLabel="Eliminar"
-            danger
-            onConfirm={handleDelete}
-            onCancel={() => setConfirmingDelete(false)}
-          />
-        </div>
-      )}
     </div>
   );
 }

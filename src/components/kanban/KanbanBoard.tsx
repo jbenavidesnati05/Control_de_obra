@@ -5,12 +5,13 @@ import { DndContext, type DragEndEvent, PointerSensor, useSensor, useSensors } f
 import { Plus } from "lucide-react";
 import { toast } from "sonner";
 import { useTasks } from "@/hooks/useTasks";
-import { moveTask } from "@/lib/tasks";
+import { deleteTask, moveTask } from "@/lib/tasks";
 import { ESTADOS, DISCIPLINAS, type Disciplina, type Estado, type Task } from "@/lib/types";
 import { disciplinaInfo } from "@/lib/disciplinas";
 import KanbanColumn from "./KanbanColumn";
 import KanbanFilters from "./KanbanFilters";
 import TaskFormModal from "@/components/tasks/TaskFormModal";
+import ConfirmDialog from "@/components/ui/ConfirmDialog";
 
 const ESTADO_TITLE: Record<Estado, string> = {
   POR_HACER: "Por hacer",
@@ -35,6 +36,7 @@ export default function KanbanBoard() {
   const [agrupar, setAgrupar] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [creatingEstado, setCreatingEstado] = useState<Estado | null>(null);
+  const [deletingTask, setDeletingTask] = useState<Task | null>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } })
@@ -70,6 +72,18 @@ export default function KanbanBoard() {
       await moveTask(task.id, nuevoEstado);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "No se pudo mover la tarea.");
+    }
+  }
+
+  async function handleConfirmDelete() {
+    if (!deletingTask) return;
+    const task = deletingTask;
+    setDeletingTask(null);
+    try {
+      await deleteTask(task.id);
+      toast.success("Tarea eliminada.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "No se pudo eliminar la tarea.");
     }
   }
 
@@ -132,6 +146,7 @@ export default function KanbanBoard() {
                             accent={ESTADO_ACCENT[estado]}
                             tasks={tasksFor(estado, d)}
                             onCardClick={setEditingTask}
+                            onDeleteRequest={setDeletingTask}
                           />
                         ))}
                       </div>
@@ -149,6 +164,7 @@ export default function KanbanBoard() {
                     accent={ESTADO_ACCENT[estado]}
                     tasks={tasksFor(estado)}
                     onCardClick={setEditingTask}
+                    onDeleteRequest={setDeletingTask}
                   />
                 ))}
               </div>
@@ -160,6 +176,16 @@ export default function KanbanBoard() {
       {editingTask && <TaskFormModal task={editingTask} onClose={() => setEditingTask(null)} />}
       {creatingEstado && (
         <TaskFormModal defaultEstado={creatingEstado} onClose={() => setCreatingEstado(null)} />
+      )}
+      {deletingTask && (
+        <ConfirmDialog
+          title="Eliminar tarea"
+          message={`¿Eliminar "${deletingTask.titulo}"? Esta acción no se puede deshacer.`}
+          confirmLabel="Eliminar"
+          danger
+          onConfirm={handleConfirmDelete}
+          onCancel={() => setDeletingTask(null)}
+        />
       )}
     </div>
   );

@@ -11,9 +11,17 @@ interface Props {
   accent: string;
   tasks: Task[];
   onCardClick: (task: Task) => void;
+  onDeleteRequest: (task: Task) => void;
 }
 
-export default function KanbanColumn({ estado, title, accent, tasks, onCardClick }: Props) {
+export default function KanbanColumn({
+  estado,
+  title,
+  accent,
+  tasks,
+  onCardClick,
+  onDeleteRequest,
+}: Props) {
   const { setNodeRef, isOver } = useDroppable({ id: estado });
 
   return (
@@ -43,7 +51,12 @@ export default function KanbanColumn({ estado, title, accent, tasks, onCardClick
           <p className="mt-4 text-center text-xs text-slate-400">Sin tareas</p>
         )}
         {tasks.map((task) => (
-          <KanbanCard key={task.id} task={task} onClick={() => onCardClick(task)} />
+          <KanbanCard
+            key={task.id}
+            task={task}
+            onClick={() => onCardClick(task)}
+            onRequestDelete={() => onDeleteRequest(task)}
+          />
         ))}
       </div>
     </div>
