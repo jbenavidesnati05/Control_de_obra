@@ -1,5 +1,10 @@
 import { initializeApp, getApps, getApp, type FirebaseOptions } from "firebase/app";
-import { getFirestore, initializeFirestore, persistentLocalCache } from "firebase/firestore";
+import {
+  getFirestore,
+  initializeFirestore,
+  persistentLocalCache,
+  persistentMultipleTabManager,
+} from "firebase/firestore";
 
 const firebaseConfig: FirebaseOptions = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -34,8 +39,11 @@ function createFirestore() {
     // Caché local en IndexedDB: las cargas siguientes (y la navegación entre
     // /calendario y /tareas) muestran datos al instante desde disco mientras
     // Firestore sincroniza en segundo plano, en vez de esperar la red cada vez.
+    // tabManager multi-pestaña: sin esto, abrir la app en una segunda pestaña
+    // deja a esa pestaña sin poder tomar el candado de IndexedDB, y cualquier
+    // escritura (crear/eliminar tarea) se queda colgada sin resolver ni fallar.
     return initializeFirestore(firebaseApp, {
-      localCache: persistentLocalCache({}),
+      localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
     });
   } catch {
     // Ya se inicializó antes (HMR) o el navegador no soporta IndexedDB.
