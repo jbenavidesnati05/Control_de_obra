@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { DndContext, type DragEndEvent, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
 import { Plus } from "lucide-react";
+import { toast } from "sonner";
 import { useTasks } from "@/hooks/useTasks";
 import { moveTask } from "@/lib/tasks";
 import { ESTADOS, DISCIPLINAS, type Disciplina, type Estado, type Task } from "@/lib/types";
@@ -65,7 +66,11 @@ export default function KanbanBoard() {
     const nuevoEstado = over.id as Estado;
     const task = tasks.find((t) => t.id === active.id);
     if (!task || task.estado === nuevoEstado) return;
-    await moveTask(task.id, nuevoEstado);
+    try {
+      await moveTask(task.id, nuevoEstado);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "No se pudo mover la tarea.");
+    }
   }
 
   const disciplinasConTareas = agrupar

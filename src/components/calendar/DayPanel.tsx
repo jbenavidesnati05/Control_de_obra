@@ -1,9 +1,13 @@
 "use client";
 
+import { useState } from "react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { AlertTriangle, Plus, Repeat, X } from "lucide-react";
+import { AlertTriangle, Plus, Repeat, Trash2, X } from "lucide-react";
+import { toast } from "sonner";
 import DisciplinaChip from "@/components/tasks/DisciplinaChip";
+import ConfirmDialog from "@/components/ui/ConfirmDialog";
+import { deleteTask } from "@/lib/tasks";
 import { isPast } from "@/lib/utils";
 import { RECURRENCIA_LABEL_CORTO } from "@/lib/recurrencia";
 import { ESTADOS_FINALES, type Task } from "@/lib/types";
@@ -18,6 +22,19 @@ interface Props {
 
 export default function DayPanel({ date, tasks, onClose, onAdd, onSelectTask }: Props) {
   const sorted = [...tasks].sort((a, b) => a.titulo.localeCompare(b.titulo));
+  const [deletingTask, setDeletingTask] = useState<Task | null>(null);
+
+  async function handleDelete() {
+    if (!deletingTask) return;
+    const task = deletingTask;
+    setDeletingTask(null);
+    try {
+      await deleteTask(task.id);
+      toast.success("Tarea eliminada.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "No se pudo eliminar la tarea.");
+    }
+  }
 
   return (
     <aside className="flex h-full w-full flex-col border-l border-slate-200 bg-white sm:w-80">
@@ -56,10 +73,10 @@ export default function DayPanel({ date, tasks, onClose, onAdd, onSelectTask }: 
           {sorted.map((task) => {
             const vencida = task.fecha && !ESTADOS_FINALES.includes(task.estado) && isPast(task.fecha);
             return (
-              <li key={task.id}>
+              <li key={task.id} className="group relative">
                 <button
                   onClick={() => onSelectTask(task)}
-                  className="w-full rounded-xl border border-slate-200 bg-white p-3 text-left shadow-sm transition-shadow hover:border-blue-200 hover:shadow-md"
+                  className="w-full rounded-xl border border-slate-200 bg-white p-3 pr-9 text-left shadow-sm transition-shadow hover:border-blue-200 hover:shadow-md"
                 >
                   <div className="mb-1.5 flex items-center gap-1.5">
                     <DisciplinaChip disciplina={task.disciplina} size="xs" />
@@ -86,11 +103,30 @@ export default function DayPanel({ date, tasks, onClose, onAdd, onSelectTask }: 
                     <p className="mt-0.5 text-xs text-slate-500">{task.responsable}</p>
                   )}
                 </button>
+                <button
+                  type="button"
+                  onClick={() => setDeletingTask(task)}
+                  aria-label="Eliminar tarea"
+                  className="absolute right-2 top-2 rounded-md p-1 text-slate-300 transition-colors hover:bg-red-50 hover:text-red-600 sm:opacity-0 sm:group-hover:opacity-100"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </button>
               </li>
             );
           })}
         </ul>
       </div>
+
+      {deletingTask && (
+        <ConfirmDialog
+          title="Eliminar tarea"
+          message={`¿Eliminar "${deletingTask.titulo}"? Esta acción no se puede deshacer.`}
+          confirmLabel="Eliminar"
+          danger
+          onConfirm={handleDelete}
+          onCancel={() => setDeletingTask(null)}
+        />
+      )}
     </aside>
   );
 }

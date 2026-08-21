@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { Toaster } from "sonner";
 import Header from "@/components/layout/Header";
 import { TasksProvider } from "@/hooks/useTasks";
 import "./globals.css";
@@ -26,6 +27,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
+        <Toaster position="top-right" richColors closeButton />
         <TasksProvider>
           <Header />
           <main className="flex flex-1 flex-col min-h-0">

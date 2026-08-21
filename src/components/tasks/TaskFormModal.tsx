@@ -2,7 +2,9 @@
 
 import { useState } from "react";
 import { Trash2 } from "lucide-react";
+import { toast } from "sonner";
 import Modal from "@/components/ui/Modal";
+import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import { createTask, updateTask, deleteTask } from "@/lib/tasks";
 import { DISCIPLINA_INFO } from "@/lib/disciplinas";
 import { RECURRENCIA_LABEL } from "@/lib/recurrencia";
@@ -52,6 +54,7 @@ export default function TaskFormModal({ onClose, task, defaultFecha, defaultEsta
   const [notas, setNotas] = useState(task?.notas ?? "");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -76,25 +79,32 @@ export default function TaskFormModal({ onClose, task, defaultFecha, defaultEsta
       };
       if (isEdit && task) {
         await updateTask(task.id, input);
+        toast.success("Tarea actualizada.");
       } else {
         await createTask(input);
+        toast.success("Tarea creada.");
       }
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "No se pudo guardar la tarea.");
+      const message = err instanceof Error ? err.message : "No se pudo guardar la tarea.";
+      setError(message);
+      toast.error(message);
       setSaving(false);
     }
   }
 
   async function handleDelete() {
     if (!task) return;
-    if (!confirm(`¿Eliminar "${task.titulo}"? Esta acción no se puede deshacer.`)) return;
+    setConfirmingDelete(false);
     setSaving(true);
     try {
       await deleteTask(task.id);
+      toast.success("Tarea eliminada.");
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "No se pudo eliminar la tarea.");
+      const message = err instanceof Error ? err.message : "No se pudo eliminar la tarea.";
+      setError(message);
+      toast.error(message);
       setSaving(false);
     }
   }
@@ -234,7 +244,7 @@ export default function TaskFormModal({ onClose, task, defaultFecha, defaultEsta
           {isEdit ? (
             <button
               type="button"
-              onClick={handleDelete}
+              onClick={() => setConfirmingDelete(true)}
               disabled={saving}
               className="flex items-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50 disabled:opacity-50"
             >
@@ -262,6 +272,17 @@ export default function TaskFormModal({ onClose, task, defaultFecha, defaultEsta
           </div>
         </div>
       </form>
+
+      {confirmingDelete && task && (
+        <ConfirmDialog
+          title="Eliminar tarea"
+          message={`¿Eliminar "${task.titulo}"? Esta acción no se puede deshacer.`}
+          confirmLabel="Eliminar"
+          danger
+          onConfirm={handleDelete}
+          onCancel={() => setConfirmingDelete(false)}
+        />
+      )}
     </Modal>
   );
 }
