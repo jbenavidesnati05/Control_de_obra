@@ -10,6 +10,16 @@ const firebaseConfig: FirebaseOptions = {
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
 };
 
+// Sin projectId, Firestore genera paths como "projects//databases/..." y entra
+// en un loop infinito de reintentos silenciosos en vez de fallar. Preferimos
+// un error explícito apuntando a la variable de entorno faltante.
+if (!firebaseConfig.projectId) {
+  throw new Error(
+    "Falta NEXT_PUBLIC_FIREBASE_PROJECT_ID (y posiblemente otras NEXT_PUBLIC_FIREBASE_*). " +
+      "Configura las variables de entorno de Firebase antes de compilar/desplegar."
+  );
+}
+
 // Evita reinicializar la app de Firebase en cada render / HMR.
 export const firebaseApp = getApps().length ? getApp() : initializeApp(firebaseConfig);
 
