@@ -37,6 +37,40 @@ const TIPO_LABEL: Record<string, string> = {
   ENTREGABLE: "Entregable",
 };
 
+// Igual que Outlook/Teams al crear un evento recurrente: no hay motor de
+// recurrencia real (ver src/lib/types.ts), así que se materializan
+// ocurrencias concretas como tareas independientes. Tope de seguridad para
+// no generar cientos de documentos por accidente.
+const MAX_OCURRENCIAS_SERIE = 52;
+
+function addDiasLocal(date: Date, dias: number): Date {
+  const d = new Date(date);
+  d.setDate(d.getDate() + dias);
+  return d;
+}
+
+function calcularFechasSerie(
+  anchor: Date,
+  recurrencia: Recurrencia,
+  finSerie: "ocurrencias" | "fecha",
+  ocurrencias: number,
+  hastaFecha: Date | null
+): Date[] {
+  const paso = recurrencia === "SEMANAL" ? 7 : 14;
+  const fechas: Date[] = [];
+  if (finSerie === "ocurrencias") {
+    const n = Math.min(Math.max(Math.floor(ocurrencias) - 1, 0), MAX_OCURRENCIAS_SERIE);
+    for (let i = 1; i <= n; i++) fechas.push(addDiasLocal(anchor, paso * i));
+  } else if (hastaFecha) {
+    for (let i = 1; i <= MAX_OCURRENCIAS_SERIE; i++) {
+      const d = addDiasLocal(anchor, paso * i);
+      if (d.getTime() > hastaFecha.getTime()) break;
+      fechas.push(d);
+    }
+  }
+  return fechas;
+}
+
 interface Props {
   onClose: () => void;
   task?: Task | null; // si viene, es edición
@@ -59,6 +93,9 @@ export default function TaskFormModal({ onClose, task, defaultFecha, defaultEsta
   const [recurrencia, setRecurrencia] = useState<"" | Recurrencia>(task?.recurrencia ?? "");
   const [notas, setNotas] = useState(task?.notas ?? "");
   const [enviado, setEnviado] = useState(task?.enviado ?? false);
+  const [finSerie, setFinSerie] = useState<"ocurrencias" | "fecha">("ocurrencias");
+  const [serieOcurrencias, setSerieOcurrencias] = useState(10);
+  const [serieHastaFecha, setSerieHastaFecha] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
@@ -67,6 +104,10 @@ export default function TaskFormModal({ onClose, task, defaultFecha, defaultEsta
     e.preventDefault();
     if (!titulo.trim()) {
       setError("El título es obligatorio.");
+      return;
+    }
+    if (!isEdit && recurrencia && finSerie === "fecha" && !serieHastaFecha) {
+      setError('Elige la fecha de fin de la serie, o cambia a "Después de N repeticiones".');
       return;
     }
     setSaving(true);
@@ -92,7 +133,33 @@ export default function TaskFormModal({ onClose, task, defaultFecha, defaultEsta
         toast.success("Tarea actualizada.");
       } else {
         await createTask(input);
-        toast.success("Tarea creada.");
+
+        if (recurrencia && input.fecha) {
+          const fechasSerie = calcularFechasSerie(
+            input.fecha,
+            recurrencia,
+            finSerie,
+            serieOcurrencias,
+            finSerie === "fecha" ? fromDateInputValue(serieHastaFecha) : null
+          );
+          let creadas = 1;
+          let fallidas = 0;
+          for (const f of fechasSerie) {
+            try {
+              await createTask({ ...input, fecha: f });
+              creadas++;
+            } catch {
+              fallidas++;
+            }
+          }
+          toast.success(
+            fallidas > 0
+              ? `Serie creada: ${creadas} tareas (${fallidas} fallaron).`
+              : `Serie creada: ${creadas} tareas.`
+          );
+        } else {
+          toast.success("Tarea creada.");
+        }
       }
       onClose();
     } catch (err) {
@@ -247,6 +314,57 @@ export default function TaskFormModal({ onClose, task, defaultFecha, defaultEsta
             </select>
           </div>
         </div>
+
+        {!isEdit && recurrencia && (
+          <div className="rounded-lg border border-indigo-100 bg-indigo-50/50 p-3">
+            <p className="mb-2 text-xs font-medium text-indigo-700">
+              Repetir {RECURRENCIA_LABEL[recurrencia].toLowerCase()} — ¿hasta cuándo?
+            </p>
+            <div className="flex flex-col gap-2">
+              <label className="flex items-center gap-2 text-sm text-slate-700">
+                <input
+                  type="radio"
+                  name="finSerie"
+                  checked={finSerie === "ocurrencias"}
+                  onChange={() => setFinSerie("ocurrencias")}
+                  className="h-3.5 w-3.5 text-blue-600 focus:ring-blue-500"
+                />
+                Después de
+                <input
+                  type="number"
+                  min={1}
+                  max={MAX_OCURRENCIAS_SERIE + 1}
+                  value={serieOcurrencias}
+                  disabled={finSerie !== "ocurrencias"}
+                  onChange={(e) => setSerieOcurrencias(Number(e.target.value))}
+                  className="w-16 rounded-md border border-slate-300 px-2 py-1 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:opacity-50"
+                />
+                repeticiones
+              </label>
+              <label className="flex items-center gap-2 text-sm text-slate-700">
+                <input
+                  type="radio"
+                  name="finSerie"
+                  checked={finSerie === "fecha"}
+                  onChange={() => setFinSerie("fecha")}
+                  className="h-3.5 w-3.5 text-blue-600 focus:ring-blue-500"
+                />
+                Hasta el
+                <input
+                  type="date"
+                  value={serieHastaFecha}
+                  disabled={finSerie !== "fecha"}
+                  onChange={(e) => setSerieHastaFecha(e.target.value)}
+                  className="rounded-md border border-slate-300 px-2 py-1 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:opacity-50"
+                />
+              </label>
+            </div>
+            <p className="mt-2 text-[11px] text-slate-500">
+              Se crea una tarea independiente por cada fecha (máx. {MAX_OCURRENCIAS_SERIE + 1} en
+              total), igual que en Outlook/Teams.
+            </p>
+          </div>
+        )}
 
         <label className="flex items-center gap-2 text-sm text-slate-700">
           <input

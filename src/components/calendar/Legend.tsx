@@ -22,6 +22,10 @@ export default function Legend() {
         <Repeat className="h-3 w-3 opacity-70" />
         Tarea recurrente (semanal/quincenal)
       </span>
+      <span className="inline-flex items-center gap-1 border-l border-slate-200 pl-3">
+        <span className="h-2 w-2 rounded-sm bg-red-100/80 ring-1 ring-inset ring-red-200" />
+        Fin de semana / festivo (no laboral)
+      </span>
     </div>
   );
 }

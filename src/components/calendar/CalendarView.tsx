@@ -9,6 +9,7 @@ import { getMonthMatrix, getWeekDays } from "@/lib/calendarUtils";
 import { disciplinaInfo } from "@/lib/disciplinas";
 import { tipoColor } from "@/lib/tipoColor";
 import { isVencida, isProximo } from "@/lib/taskStatus";
+import { festivoEn, esFinDeSemana } from "@/lib/festivosColombia";
 import { isSameDay, cn } from "@/lib/utils";
 import { RECURRENCIA_LABEL } from "@/lib/recurrencia";
 import type { Task } from "@/lib/types";
@@ -150,16 +151,26 @@ export default function CalendarView() {
                   const selected = selectedDay && isSameDay(day, selectedDay);
                   const visibleTasks = dayTasks.slice(0, MAX_CHIPS_POR_DIA);
                   const extra = dayTasks.length - visibleTasks.length;
+                  const festivo = festivoEn(day);
+                  const noLaboral = esFinDeSemana(day) || !!festivo;
+                  const bgClass = selected
+                    ? "bg-blue-50"
+                    : noLaboral
+                      ? "bg-red-100/80"
+                      : !inMonth
+                        ? "bg-slate-50/60"
+                        : "";
 
                   return (
                     <button
                       key={`${wi}-${di}`}
                       onClick={() => setSelectedDay(day)}
+                      title={festivo ?? undefined}
                       className={cn(
                         "flex min-h-[100px] flex-col gap-1 border-b border-r border-slate-100 p-1.5 text-left align-top transition-colors hover:bg-slate-50",
                         vista === "semana" && "min-h-[420px]",
-                        !inMonth && "bg-slate-50/60",
-                        selected && "bg-blue-50 ring-1 ring-inset ring-blue-300"
+                        bgClass,
+                        selected && "ring-1 ring-inset ring-blue-300"
                       )}
                     >
                       <span
@@ -174,6 +185,11 @@ export default function CalendarView() {
                       >
                         {format(day, "d")}
                       </span>
+                      {festivo && (
+                        <span className="truncate text-[10px] font-medium text-red-700">
+                          {festivo}
+                        </span>
+                      )}
 
                       <div className="flex flex-1 flex-col gap-1">
                         {visibleTasks.map((task) => {

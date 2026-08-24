@@ -10,6 +10,7 @@ import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import { deleteTask, setEnviado } from "@/lib/tasks";
 import { tipoColor } from "@/lib/tipoColor";
 import { isVencida, isProximo } from "@/lib/taskStatus";
+import { festivoEn, esFinDeSemana } from "@/lib/festivosColombia";
 import { cn } from "@/lib/utils";
 import { RECURRENCIA_LABEL_CORTO } from "@/lib/recurrencia";
 import type { Task } from "@/lib/types";
@@ -25,6 +26,8 @@ interface Props {
 export default function DayPanel({ date, tasks, onClose, onAdd, onSelectTask }: Props) {
   const sorted = [...tasks].sort((a, b) => a.titulo.localeCompare(b.titulo));
   const [deletingTask, setDeletingTask] = useState<Task | null>(null);
+  const festivo = festivoEn(date);
+  const noLaboral = esFinDeSemana(date) || !!festivo;
 
   async function handleDelete() {
     if (!deletingTask) return;
@@ -50,7 +53,12 @@ export default function DayPanel({ date, tasks, onClose, onAdd, onSelectTask }: 
 
   return (
     <aside className="flex h-full w-full flex-col border-l border-slate-200 bg-white sm:w-80">
-      <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
+      <div
+        className={cn(
+          "flex items-center justify-between border-b border-slate-100 px-4 py-3",
+          noLaboral && "bg-red-50"
+        )}
+      >
         <div>
           <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
             {format(date, "EEEE", { locale: es })}
@@ -58,6 +66,10 @@ export default function DayPanel({ date, tasks, onClose, onAdd, onSelectTask }: 
           <p className="text-sm font-semibold text-slate-900">
             {format(date, "d 'de' MMMM yyyy", { locale: es })}
           </p>
+          {festivo && <p className="mt-0.5 text-xs font-medium text-red-700">Festivo: {festivo}</p>}
+          {!festivo && esFinDeSemana(date) && (
+            <p className="mt-0.5 text-xs font-medium text-red-700">Fin de semana · no laboral</p>
+          )}
         </div>
         <button
           onClick={onClose}
