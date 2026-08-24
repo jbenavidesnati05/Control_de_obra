@@ -3,13 +3,15 @@
 import { useMemo, useState } from "react";
 import { format, addMonths, subMonths, addWeeks, subWeeks, isToday, isSameMonth } from "date-fns";
 import { es } from "date-fns/locale";
-import { ChevronLeft, ChevronRight, Plus, AlertTriangle, Repeat } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, AlertTriangle, Repeat, Clock } from "lucide-react";
 import { useTasks } from "@/hooks/useTasks";
 import { getMonthMatrix, getWeekDays } from "@/lib/calendarUtils";
 import { disciplinaInfo } from "@/lib/disciplinas";
-import { isSameDay, isPast, cn } from "@/lib/utils";
+import { tipoColor } from "@/lib/tipoColor";
+import { isVencida, isProximo } from "@/lib/taskStatus";
+import { isSameDay, cn } from "@/lib/utils";
 import { RECURRENCIA_LABEL } from "@/lib/recurrencia";
-import { ESTADOS_FINALES, type Task } from "@/lib/types";
+import type { Task } from "@/lib/types";
 import DayPanel from "./DayPanel";
 import Legend from "./Legend";
 import TaskFormModal from "@/components/tasks/TaskFormModal";
@@ -176,7 +178,9 @@ export default function CalendarView() {
                       <div className="flex flex-1 flex-col gap-1">
                         {visibleTasks.map((task) => {
                           const info = disciplinaInfo(task.disciplina);
-                          const vencida = !ESTADOS_FINALES.includes(task.estado) && isPast(day);
+                          const color = tipoColor(task.tipo);
+                          const vencida = isVencida(task);
+                          const proximo = isProximo(task);
                           return (
                             <div
                               key={task.id}
@@ -186,9 +190,13 @@ export default function CalendarView() {
                               }}
                               className={cn(
                                 "truncate rounded px-1.5 py-0.5 text-[11px] font-medium",
-                                vencida && "ring-1 ring-red-500"
+                                vencida && "ring-1 ring-red-500",
+                                proximo && "ring-1 ring-amber-500"
                               )}
-                              style={{ backgroundColor: info.bg, color: info.text }}
+                              style={{
+                                backgroundColor: color?.bg ?? info.bg,
+                                color: color?.text ?? info.text,
+                              }}
                               title={
                                 task.recurrencia
                                   ? `${task.titulo} · se repite ${RECURRENCIA_LABEL[task.recurrencia].toLowerCase()}`
@@ -201,6 +209,8 @@ export default function CalendarView() {
                               {task.recurrencia && (
                                 <Repeat className="mr-0.5 inline h-2.5 w-2.5 opacity-70" />
                               )}
+                              {proximo && <Clock className="mr-0.5 inline h-2.5 w-2.5" />}
+                              {task.horaInicio && `${task.horaInicio} · `}
                               {task.titulo}
                             </div>
                           );

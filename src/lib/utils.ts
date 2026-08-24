@@ -19,6 +19,14 @@ export function isPast(date: Date, today = new Date()): boolean {
   return d.getTime() < t.getTime();
 }
 
+// Días de calendario (no horas) entre hoy y `date`. 0 = hoy, 2 = pasado mañana,
+// negativo = ya pasó. Usado para el aviso "faltan N días" de comités/cortes/entregables.
+export function daysUntil(date: Date, today = new Date()): number {
+  const d = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  const t = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  return Math.round((d.getTime() - t.getTime()) / 86400000);
+}
+
 export function toDateInputValue(date: Date | null | undefined): string {
   if (!date) return "";
   const yyyy = date.getFullYear();

@@ -6,7 +6,14 @@ import { Plus } from "lucide-react";
 import { toast } from "sonner";
 import { useTasks } from "@/hooks/useTasks";
 import { deleteTask, moveTask } from "@/lib/tasks";
-import { ESTADOS, DISCIPLINAS, type Disciplina, type Estado, type Task } from "@/lib/types";
+import {
+  ESTADOS,
+  DISCIPLINAS,
+  TIPOS_SOLO_CALENDARIO,
+  type Disciplina,
+  type Estado,
+  type Task,
+} from "@/lib/types";
 import { disciplinaInfo } from "@/lib/disciplinas";
 import KanbanColumn from "./KanbanColumn";
 import KanbanFilters from "./KanbanFilters";
@@ -42,19 +49,26 @@ export default function KanbanBoard() {
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } })
   );
 
+  // Comités, cortes, hitos de cronograma y entregables viven en el Calendario;
+  // el Kanban es solo para tareas de trabajo por disciplina.
+  const tareasDeTrabajo = useMemo(
+    () => tasks.filter((t) => !TIPOS_SOLO_CALENDARIO.includes(t.tipo)),
+    [tasks]
+  );
+
   const responsables = useMemo(() => {
     const set = new Set<string>();
-    for (const t of tasks) if (t.responsable) set.add(t.responsable);
+    for (const t of tareasDeTrabajo) if (t.responsable) set.add(t.responsable);
     return Array.from(set).sort();
-  }, [tasks]);
+  }, [tareasDeTrabajo]);
 
   const filtered = useMemo(() => {
-    return tasks.filter((t) => {
+    return tareasDeTrabajo.filter((t) => {
       if (disciplinaFiltro && t.disciplina !== disciplinaFiltro) return false;
       if (responsableFiltro && t.responsable !== responsableFiltro) return false;
       return true;
     });
-  }, [tasks, disciplinaFiltro, responsableFiltro]);
+  }, [tareasDeTrabajo, disciplinaFiltro, responsableFiltro]);
 
   function tasksFor(estado: Estado, disciplina?: Disciplina) {
     return filtered.filter(

@@ -26,9 +26,12 @@ function fromFirestore(snap: QueryDocumentSnapshot<DocumentData>): Task {
     estado: data.estado,
     tipo: data.tipo,
     fecha: data.fecha instanceof Timestamp ? data.fecha.toDate() : null,
+    horaInicio: data.horaInicio ?? null,
+    horaFin: data.horaFin ?? null,
     esStopper: !!data.esStopper,
     recurrencia: data.recurrencia ?? null,
     notas: data.notas ?? "",
+    enviado: !!data.enviado,
     createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate() : undefined,
     updatedAt: data.updatedAt instanceof Timestamp ? data.updatedAt.toDate() : undefined,
   };
@@ -70,6 +73,11 @@ export async function updateTask(id: string, input: Partial<TaskInput>) {
 export async function moveTask(id: string, estado: Estado) {
   const ref = doc(db, TASKS_COLLECTION, id);
   await updateDoc(ref, { estado, updatedAt: serverTimestamp() });
+}
+
+export async function setEnviado(id: string, enviado: boolean) {
+  const ref = doc(db, TASKS_COLLECTION, id);
+  await updateDoc(ref, { enviado, updatedAt: serverTimestamp() });
 }
 
 export async function deleteTask(id: string) {

@@ -3,14 +3,16 @@
 import { useState } from "react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { AlertTriangle, Plus, Repeat, Trash2, X } from "lucide-react";
+import { AlertTriangle, Check, Clock, Plus, Repeat, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import DisciplinaChip from "@/components/tasks/DisciplinaChip";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
-import { deleteTask } from "@/lib/tasks";
-import { isPast } from "@/lib/utils";
+import { deleteTask, setEnviado } from "@/lib/tasks";
+import { tipoColor } from "@/lib/tipoColor";
+import { isVencida, isProximo } from "@/lib/taskStatus";
+import { cn } from "@/lib/utils";
 import { RECURRENCIA_LABEL_CORTO } from "@/lib/recurrencia";
-import { ESTADOS_FINALES, type Task } from "@/lib/types";
+import type { Task } from "@/lib/types";
 
 interface Props {
   date: Date;
@@ -33,6 +35,16 @@ export default function DayPanel({ date, tasks, onClose, onAdd, onSelectTask }: 
       toast.success("Tarea eliminada.");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "No se pudo eliminar la tarea.");
+    }
+  }
+
+  async function handleToggleEnviado(task: Task, e: React.MouseEvent) {
+    e.stopPropagation();
+    try {
+      await setEnviado(task.id, !task.enviado);
+      toast.success(task.enviado ? "Marcado como pendiente." : "Marcado como enviado.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "No se pudo actualizar.");
     }
   }
 
@@ -71,15 +83,28 @@ export default function DayPanel({ date, tasks, onClose, onAdd, onSelectTask }: 
 
         <ul className="space-y-2">
           {sorted.map((task) => {
-            const vencida = task.fecha && !ESTADOS_FINALES.includes(task.estado) && isPast(task.fecha);
+            const vencida = isVencida(task);
+            const proximo = isProximo(task);
+            const color = tipoColor(task.tipo);
+            const esEntregable = task.tipo === "ENTREGABLE";
             return (
               <li key={task.id} className="group relative">
                 <button
                   onClick={() => onSelectTask(task)}
                   className="w-full rounded-xl border border-slate-200 bg-white p-3 pr-9 text-left shadow-sm transition-shadow hover:border-blue-200 hover:shadow-md"
                 >
-                  <div className="mb-1.5 flex items-center gap-1.5">
+                  <div className="mb-1.5 flex flex-wrap items-center gap-1.5">
                     <DisciplinaChip disciplina={task.disciplina} size="xs" />
+                    {color && (
+                      <span
+                        className="rounded-full px-1.5 py-0.5 text-[10px] font-semibold"
+                        style={{ backgroundColor: color.bg, color: color.text }}
+                      >
+                        {task.tipo === "COMITE" && "COMITÉ"}
+                        {task.tipo === "CORTE_PROGRAMACION" && "CORTE"}
+                        {task.tipo === "ENTREGABLE" && "ENTREGABLE"}
+                      </span>
+                    )}
                     {task.esStopper && (
                       <span className="inline-flex items-center gap-0.5 rounded-full bg-red-50 px-1.5 py-0.5 text-[10px] font-semibold text-red-700">
                         <AlertTriangle className="h-2.5 w-2.5" />
@@ -91,26 +116,58 @@ export default function DayPanel({ date, tasks, onClose, onAdd, onSelectTask }: 
                         VENCIDA
                       </span>
                     )}
+                    {proximo && (
+                      <span className="inline-flex items-center gap-0.5 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-800">
+                        <Clock className="h-2.5 w-2.5" />
+                        PRÓXIMO
+                      </span>
+                    )}
                     {task.recurrencia && (
                       <span className="inline-flex items-center gap-0.5 rounded-full bg-indigo-50 px-1.5 py-0.5 text-[10px] font-semibold text-indigo-700">
                         <Repeat className="h-2.5 w-2.5" />
                         {RECURRENCIA_LABEL_CORTO[task.recurrencia]}
                       </span>
                     )}
+                    {esEntregable && task.enviado && (
+                      <span className="inline-flex items-center gap-0.5 rounded-full bg-green-100 px-1.5 py-0.5 text-[10px] font-semibold text-green-800">
+                        <Check className="h-2.5 w-2.5" />
+                        ENVIADO
+                      </span>
+                    )}
                   </div>
-                  <p className="text-sm font-medium text-slate-900">{task.titulo}</p>
+                  <p className="text-sm font-medium text-slate-900">
+                    {task.horaInicio && (
+                      <span className="mr-1 font-normal text-slate-500">{task.horaInicio}</span>
+                    )}
+                    {task.titulo}
+                  </p>
                   {task.responsable && (
                     <p className="mt-0.5 text-xs text-slate-500">{task.responsable}</p>
                   )}
                 </button>
-                <button
-                  type="button"
-                  onClick={() => setDeletingTask(task)}
-                  aria-label="Eliminar tarea"
-                  className="absolute right-2 top-2 rounded-md p-1 text-slate-300 transition-colors hover:bg-red-50 hover:text-red-600 sm:opacity-0 sm:group-hover:opacity-100"
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                </button>
+                <div className="absolute right-2 top-2 flex items-center gap-0.5 sm:opacity-0 sm:group-hover:opacity-100">
+                  {esEntregable && (
+                    <button
+                      type="button"
+                      onClick={(e) => handleToggleEnviado(task, e)}
+                      aria-label={task.enviado ? "Marcar como pendiente" : "Marcar como enviado"}
+                      className={cn(
+                        "rounded-md p-1 transition-colors hover:bg-green-50 hover:text-green-600",
+                        task.enviado ? "text-green-600" : "text-slate-300"
+                      )}
+                    >
+                      <Check className="h-3.5 w-3.5" />
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setDeletingTask(task)}
+                    aria-label="Eliminar tarea"
+                    className="rounded-md p-1 text-slate-300 transition-colors hover:bg-red-50 hover:text-red-600"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                </div>
               </li>
             );
           })}

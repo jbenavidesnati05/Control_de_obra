@@ -31,6 +31,10 @@ const TIPO_LABEL: Record<string, string> = {
   TAREA: "Tarea",
   EVENTO: "Evento",
   SOLICITUD: "Solicitud",
+  COMITE: "Comité",
+  CORTE_PROGRAMACION: "Corte de programación",
+  HITO_CRONOGRAMA: "Hito de cronograma",
+  ENTREGABLE: "Entregable",
 };
 
 interface Props {
@@ -49,9 +53,12 @@ export default function TaskFormModal({ onClose, task, defaultFecha, defaultEsta
   const [estado, setEstado] = useState(task?.estado ?? defaultEstado ?? "POR_HACER");
   const [tipo, setTipo] = useState(task?.tipo ?? "TAREA");
   const [fecha, setFecha] = useState(toDateInputValue(task?.fecha ?? defaultFecha ?? null));
+  const [horaInicio, setHoraInicio] = useState(task?.horaInicio ?? "");
+  const [horaFin, setHoraFin] = useState(task?.horaFin ?? "");
   const [esStopper, setEsStopper] = useState(task?.esStopper ?? false);
   const [recurrencia, setRecurrencia] = useState<"" | Recurrencia>(task?.recurrencia ?? "");
   const [notas, setNotas] = useState(task?.notas ?? "");
+  const [enviado, setEnviado] = useState(task?.enviado ?? false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
@@ -73,9 +80,12 @@ export default function TaskFormModal({ onClose, task, defaultFecha, defaultEsta
         estado,
         tipo,
         fecha: fromDateInputValue(fecha),
+        horaInicio: horaInicio || null,
+        horaFin: horaFin || null,
         esStopper,
         recurrencia: recurrencia || null,
         notas: notas.trim(),
+        enviado,
       };
       if (isEdit && task) {
         await updateTask(task.id, input);
@@ -187,6 +197,27 @@ export default function TaskFormModal({ onClose, task, defaultFecha, defaultEsta
 
         <div className="grid grid-cols-2 gap-3">
           <div>
+            <label className="mb-1 block text-xs font-medium text-slate-600">Hora inicio</label>
+            <input
+              type="time"
+              value={horaInicio}
+              onChange={(e) => setHoraInicio(e.target.value)}
+              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-slate-600">Hora fin</label>
+            <input
+              type="time"
+              value={horaFin}
+              onChange={(e) => setHoraFin(e.target.value)}
+              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <div>
             <label className="mb-1 block text-xs font-medium text-slate-600">Estado</label>
             <select
               value={estado}
@@ -226,6 +257,18 @@ export default function TaskFormModal({ onClose, task, defaultFecha, defaultEsta
           />
           Es <span className="font-semibold text-red-600">stopper</span>
         </label>
+
+        {tipo === "ENTREGABLE" && (
+          <label className="flex items-center gap-2 text-sm text-slate-700">
+            <input
+              type="checkbox"
+              checked={enviado}
+              onChange={(e) => setEnviado(e.target.checked)}
+              className="h-4 w-4 rounded border-slate-300 text-green-600 focus:ring-green-500"
+            />
+            <span className="font-semibold text-green-700">Enviado</span> al cliente/interventoría
+          </label>
+        )}
 
         <div>
           <label className="mb-1 block text-xs font-medium text-slate-600">Notas</label>

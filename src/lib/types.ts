@@ -12,7 +12,24 @@ export type Disciplina =
 
 export type Estado = "POR_HACER" | "EN_ANALISIS" | "EN_GESTION" | "HECHA" | "CERRADA";
 
-export type Tipo = "TAREA" | "EVENTO" | "SOLICITUD";
+export type Tipo =
+  | "TAREA"
+  | "EVENTO"
+  | "SOLICITUD"
+  | "COMITE"
+  | "CORTE_PROGRAMACION"
+  | "HITO_CRONOGRAMA"
+  | "ENTREGABLE";
+
+// Tipos que son eventos administrativos/de cronograma general del proyecto:
+// se muestran en el Calendario pero no en el tablero Kanban (que es para
+// tareas de trabajo por disciplina, no para bitácoras/comités/hitos).
+export const TIPOS_SOLO_CALENDARIO: Tipo[] = [
+  "COMITE",
+  "CORTE_PROGRAMACION",
+  "HITO_CRONOGRAMA",
+  "ENTREGABLE",
+];
 
 // Recurrencia informativa: solo marca visualmente que la tarea/evento hace
 // parte de una serie que se repite. No genera automáticamente las próximas
@@ -40,7 +57,15 @@ export const ESTADOS: Estado[] = ["POR_HACER", "EN_ANALISIS", "EN_GESTION", "HEC
 // (una tarea con fecha pasada en uno de estos estados ya no se marca como vencida).
 export const ESTADOS_FINALES: Estado[] = ["HECHA", "CERRADA"];
 
-export const TIPOS: Tipo[] = ["TAREA", "EVENTO", "SOLICITUD"];
+export const TIPOS: Tipo[] = [
+  "TAREA",
+  "EVENTO",
+  "SOLICITUD",
+  "COMITE",
+  "CORTE_PROGRAMACION",
+  "HITO_CRONOGRAMA",
+  "ENTREGABLE",
+];
 
 // Forma de la tarea en el cliente (Timestamps ya convertidos a Date).
 export interface Task {
@@ -52,9 +77,13 @@ export interface Task {
   estado: Estado;
   tipo: Tipo;
   fecha?: Date | null;
+  horaInicio?: string | null; // "HH:mm", opcional (comités, cortes)
+  horaFin?: string | null;
   esStopper: boolean;
   recurrencia?: Recurrencia | null;
   notas?: string;
+  // Solo aplica a tipo ENTREGABLE: control de cumplimiento de envío.
+  enviado?: boolean;
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -68,7 +97,10 @@ export interface TaskInput {
   estado: Estado;
   tipo: Tipo;
   fecha?: Date | null;
+  horaInicio?: string | null;
+  horaFin?: string | null;
   esStopper: boolean;
   recurrencia?: Recurrencia | null;
   notas?: string;
+  enviado?: boolean;
 }
