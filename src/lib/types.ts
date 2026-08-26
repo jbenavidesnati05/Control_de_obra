@@ -21,10 +21,12 @@ export type Tipo =
   | "HITO_CRONOGRAMA"
   | "ENTREGABLE";
 
-// Tipos que son eventos administrativos/de cronograma general del proyecto:
-// se muestran en el Calendario pero no en el tablero Kanban (que es para
-// tareas de trabajo por disciplina, no para bitácoras/comités/hitos).
+// Tipos de calendario/cronograma: son recordatorios (comités, cortes, hitos,
+// entregables, eventos) y se muestran SOLO en el Calendario, nunca en el
+// tablero Kanban. El Kanban es para tareas de ejecución por disciplina
+// (TAREA/SOLICITUD) — cronograma y tareas quedan intencionalmente separados.
 export const TIPOS_SOLO_CALENDARIO: Tipo[] = [
+  "EVENTO",
   "COMITE",
   "CORTE_PROGRAMACION",
   "HITO_CRONOGRAMA",

@@ -99,11 +99,15 @@ export default function DayPanel({ date, tasks, onClose, onAdd, onSelectTask }: 
             const proximo = isProximo(task);
             const color = tipoColor(task.tipo);
             const esEntregable = task.tipo === "ENTREGABLE";
+            const cerrada = task.estado === "CERRADA";
             return (
               <li key={task.id} className="group relative">
                 <button
                   onClick={() => onSelectTask(task)}
-                  className="w-full rounded-xl border border-slate-200 bg-white p-3 pr-9 text-left shadow-sm transition-shadow hover:border-blue-200 hover:shadow-md"
+                  className={cn(
+                    "w-full rounded-xl border border-slate-200 bg-white p-3 pr-9 text-left shadow-sm transition-shadow hover:border-blue-200 hover:shadow-md",
+                    cerrada && "grayscale opacity-75 hover:opacity-100"
+                  )}
                 >
                   <div className="mb-1.5 flex flex-wrap items-center gap-1.5">
                     <DisciplinaChip disciplina={task.disciplina} size="xs" />

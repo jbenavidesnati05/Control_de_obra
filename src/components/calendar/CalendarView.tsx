@@ -197,6 +197,7 @@ export default function CalendarView() {
                           const color = tipoColor(task.tipo);
                           const vencida = isVencida(task);
                           const proximo = isProximo(task);
+                          const cerrada = task.estado === "CERRADA";
                           return (
                             <div
                               key={task.id}
@@ -207,7 +208,8 @@ export default function CalendarView() {
                               className={cn(
                                 "truncate rounded px-1.5 py-0.5 text-[11px] font-medium",
                                 vencida && "ring-1 ring-red-500",
-                                proximo && "ring-1 ring-amber-500"
+                                proximo && "ring-1 ring-amber-500",
+                                cerrada && "grayscale opacity-75"
                               )}
                               style={{
                                 backgroundColor: color?.bg ?? info.bg,
@@ -262,7 +264,11 @@ export default function CalendarView() {
         <TaskFormModal task={editingTask} onClose={() => setEditingTask(null)} />
       )}
       {creatingFor && (
-        <TaskFormModal defaultFecha={creatingFor} onClose={() => setCreatingFor(null)} />
+        <TaskFormModal
+          defaultFecha={creatingFor}
+          defaultTipo="EVENTO"
+          onClose={() => setCreatingFor(null)}
+        />
       )}
     </div>
   );

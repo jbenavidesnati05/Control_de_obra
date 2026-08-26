@@ -76,16 +76,23 @@ interface Props {
   task?: Task | null; // si viene, es edición
   defaultFecha?: Date | null; // fecha preseleccionada al crear desde el calendario
   defaultEstado?: Task["estado"]; // estado preseleccionado al crear desde el kanban
+  defaultTipo?: Task["tipo"]; // tipo preseleccionado (EVENTO al crear desde el calendario)
 }
 
-export default function TaskFormModal({ onClose, task, defaultFecha, defaultEstado }: Props) {
+export default function TaskFormModal({
+  onClose,
+  task,
+  defaultFecha,
+  defaultEstado,
+  defaultTipo,
+}: Props) {
   const isEdit = !!task;
   const [titulo, setTitulo] = useState(task?.titulo ?? "");
   const [descripcion, setDescripcion] = useState(task?.descripcion ?? "");
   const [disciplina, setDisciplina] = useState(task?.disciplina ?? "ELECTRICO");
   const [responsable, setResponsable] = useState(task?.responsable ?? "");
   const [estado, setEstado] = useState(task?.estado ?? defaultEstado ?? "POR_HACER");
-  const [tipo, setTipo] = useState(task?.tipo ?? "TAREA");
+  const [tipo, setTipo] = useState(task?.tipo ?? defaultTipo ?? "TAREA");
   const [fecha, setFecha] = useState(toDateInputValue(task?.fecha ?? defaultFecha ?? null));
   const [horaInicio, setHoraInicio] = useState(task?.horaInicio ?? "");
   const [horaFin, setHoraFin] = useState(task?.horaFin ?? "");

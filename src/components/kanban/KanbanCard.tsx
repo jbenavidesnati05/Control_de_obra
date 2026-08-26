@@ -23,6 +23,7 @@ export default function KanbanCard({ task, onClick, onRequestDelete }: Props) {
   });
   const info = disciplinaInfo(task.disciplina);
   const vencida = task.fecha && !ESTADOS_FINALES.includes(task.estado) && isPast(task.fecha);
+  const cerrada = task.estado === "CERRADA";
 
   const style = {
     transform: CSS.Translate.toString(transform),
@@ -38,7 +39,8 @@ export default function KanbanCard({ task, onClick, onRequestDelete }: Props) {
       onClick={onClick}
       className={cn(
         "group relative cursor-grab rounded-xl border border-slate-200 border-l-4 bg-white p-3 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md active:cursor-grabbing",
-        isDragging && "opacity-40"
+        isDragging && "opacity-40",
+        cerrada && "grayscale opacity-75 hover:opacity-100"
       )}
     >
       <button
