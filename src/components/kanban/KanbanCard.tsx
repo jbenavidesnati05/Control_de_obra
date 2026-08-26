@@ -17,45 +17,15 @@ interface Props {
   onRequestDelete: () => void;
 }
 
-export default function KanbanCard({ task, onClick, onRequestDelete }: Props) {
-  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
-    id: task.id,
-  });
+// Contenido visual puro de la tarjeta, sin nada de dnd-kit: se reutiliza
+// tanto en la tarjeta arrastrable normal como en el DragOverlay (la copia
+// flotante que sigue al cursor durante el arrastre).
+export function KanbanCardBody({ task }: { task: Task }) {
   const info = disciplinaInfo(task.disciplina);
   const vencida = task.fecha && !ESTADOS_FINALES.includes(task.estado) && isPast(task.fecha);
-  const cerrada = task.estado === "CERRADA";
-
-  const style = {
-    transform: CSS.Translate.toString(transform),
-    borderLeftColor: info.color,
-  };
 
   return (
-    <div
-      ref={setNodeRef}
-      style={style}
-      {...listeners}
-      {...attributes}
-      onClick={onClick}
-      className={cn(
-        "group relative cursor-grab rounded-xl border border-slate-200 border-l-4 bg-white p-3 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md active:cursor-grabbing",
-        isDragging && "opacity-40",
-        cerrada && "grayscale opacity-75 hover:opacity-100"
-      )}
-    >
-      <button
-        type="button"
-        onClick={(e) => {
-          e.stopPropagation();
-          onRequestDelete();
-        }}
-        onPointerDown={(e) => e.stopPropagation()}
-        aria-label="Eliminar tarea"
-        className="absolute right-1.5 top-1.5 rounded-md p-1 text-slate-300 transition-colors hover:bg-red-50 hover:text-red-600 sm:opacity-0 sm:group-hover:opacity-100"
-      >
-        <Trash2 className="h-3.5 w-3.5" />
-      </button>
-
+    <>
       <div className="mb-1.5 flex flex-wrap items-center gap-1 pr-5">
         <DisciplinaChip disciplina={task.disciplina} size="xs" />
         {task.esStopper && (
@@ -93,6 +63,71 @@ export default function KanbanCard({ task, onClick, onRequestDelete }: Props) {
           </span>
         )}
       </div>
+    </>
+  );
+}
+
+// Tarjeta "fantasma" que se muestra dentro del DragOverlay: copia flotante,
+// portada al body por dnd-kit, que no se recorta con el overflow de la
+// columna de origen y sigue al cursor con su propia sombra.
+export function KanbanCardOverlay({ task }: { task: Task }) {
+  const info = disciplinaInfo(task.disciplina);
+  const cerrada = task.estado === "CERRADA";
+  return (
+    <div
+      style={{ borderLeftColor: info.color }}
+      className={cn(
+        "cursor-grabbing rounded-xl border border-slate-200 border-l-4 bg-white p-3 shadow-xl ring-1 ring-black/5",
+        cerrada && "grayscale opacity-75"
+      )}
+    >
+      <KanbanCardBody task={task} />
+    </div>
+  );
+}
+
+export default function KanbanCard({ task, onClick, onRequestDelete }: Props) {
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+    id: task.id,
+  });
+  const info = disciplinaInfo(task.disciplina);
+  const cerrada = task.estado === "CERRADA";
+
+  const style = {
+    transform: CSS.Translate.toString(transform),
+    borderLeftColor: info.color,
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      {...listeners}
+      {...attributes}
+      onClick={onClick}
+      className={cn(
+        "group relative cursor-grab rounded-xl border border-slate-200 border-l-4 bg-white p-3 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md active:cursor-grabbing",
+        // Con DragOverlay activo, la tarjeta original se vuelve invisible (el
+        // overlay es la que se ve siguiendo al cursor) para no duplicar la
+        // tarjeta en pantalla.
+        isDragging && "invisible",
+        cerrada && "grayscale opacity-75 hover:opacity-100"
+      )}
+    >
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          onRequestDelete();
+        }}
+        onPointerDown={(e) => e.stopPropagation()}
+        aria-label="Eliminar tarea"
+        className="absolute right-1.5 top-1.5 rounded-md p-1 text-slate-300 transition-colors hover:bg-red-50 hover:text-red-600 sm:opacity-0 sm:group-hover:opacity-100"
+      >
+        <Trash2 className="h-3.5 w-3.5" />
+      </button>
+
+      <KanbanCardBody task={task} />
     </div>
   );
 }

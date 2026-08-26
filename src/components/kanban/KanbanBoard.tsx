@@ -1,7 +1,15 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { DndContext, type DragEndEvent, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
+import {
+  DndContext,
+  DragOverlay,
+  type DragEndEvent,
+  type DragStartEvent,
+  PointerSensor,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core";
 import { Plus } from "lucide-react";
 import { toast } from "sonner";
 import { useTasks } from "@/hooks/useTasks";
@@ -17,6 +25,7 @@ import {
 import { disciplinaInfo } from "@/lib/disciplinas";
 import KanbanColumn from "./KanbanColumn";
 import KanbanFilters from "./KanbanFilters";
+import { KanbanCardOverlay } from "./KanbanCard";
 import TaskFormModal from "@/components/tasks/TaskFormModal";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
 
@@ -44,6 +53,7 @@ export default function KanbanBoard() {
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [creatingEstado, setCreatingEstado] = useState<Estado | null>(null);
   const [deletingTask, setDeletingTask] = useState<Task | null>(null);
+  const [activeTask, setActiveTask] = useState<Task | null>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } })
@@ -76,7 +86,13 @@ export default function KanbanBoard() {
     );
   }
 
+  function handleDragStart(event: DragStartEvent) {
+    const task = tasks.find((t) => t.id === event.active.id);
+    setActiveTask(task ?? null);
+  }
+
   async function handleDragEnd(event: DragEndEvent) {
+    setActiveTask(null);
     const { active, over } = event;
     if (!over) return;
     const nuevoEstado = over.id as Estado;
@@ -140,7 +156,12 @@ export default function KanbanBoard() {
             Cargando...
           </div>
         ) : (
-          <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
+          <DndContext
+            sensors={sensors}
+            onDragStart={handleDragStart}
+            onDragEnd={handleDragEnd}
+            onDragCancel={() => setActiveTask(null)}
+          >
             {agrupar ? (
               <div className="flex flex-col gap-6">
                 {disciplinasConTareas.map((d) => {
@@ -183,6 +204,7 @@ export default function KanbanBoard() {
                 ))}
               </div>
             )}
+            <DragOverlay>{activeTask && <KanbanCardOverlay task={activeTask} />}</DragOverlay>
           </DndContext>
         )}
       </div>
