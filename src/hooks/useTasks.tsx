@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { subscribeTasks } from "@/lib/tasks";
+import { useAuth } from "./useAuth";
 import type { Task } from "@/lib/types";
 
 interface TasksContextValue {
@@ -12,17 +13,24 @@ interface TasksContextValue {
 
 const TasksContext = createContext<TasksContextValue | null>(null);
 
-// Suscripción única a Firestore, montada una sola vez en el layout raíz.
-// Al vivir por encima de /calendario y /tareas, moverse entre esas dos
-// páginas no destruye ni recrea la conexión en tiempo real: los datos ya
-// están en memoria y la navegación es instantánea.
+// Suscripción a Firestore montada en el layout raíz, dentro de <AuthGate> (o
+// sea, solo con sesión activa). Se re-suscribe si cambia el usuario (logout
+// + login con otra cuenta), para no arrastrar datos de la sesión anterior.
 export function TasksProvider({ children }: { children: ReactNode }) {
+  const { user } = useAuth();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!user) {
+      setTasks([]);
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
     const unsubscribe = subscribeTasks(
+      user.uid,
       (data) => {
         setTasks(data);
         setLoading(false);
@@ -33,7 +41,7 @@ export function TasksProvider({ children }: { children: ReactNode }) {
       }
     );
     return () => unsubscribe();
-  }, []);
+  }, [user]);
 
   return <TasksContext.Provider value={{ tasks, loading, error }}>{children}</TasksContext.Provider>;
 }

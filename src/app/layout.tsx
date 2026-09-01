@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Toaster } from "sonner";
 import Header from "@/components/layout/Header";
+import { AuthProvider } from "@/hooks/useAuth";
+import AuthGate from "@/components/auth/AuthGate";
 import { TasksProvider } from "@/hooks/useTasks";
 import "./globals.css";
 
@@ -28,16 +30,20 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     >
       <body className="min-h-full flex flex-col">
         <Toaster position="top-right" richColors closeButton />
-        <TasksProvider>
-          <Header />
-          <main className="flex flex-1 flex-col min-h-0">
-            <div className="mx-auto flex w-full max-w-[1600px] flex-1 flex-col min-h-0 p-4 sm:p-6">
-              <div className="flex flex-1 flex-col min-h-0 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-                {children}
-              </div>
-            </div>
-          </main>
-        </TasksProvider>
+        <AuthProvider>
+          <AuthGate>
+            <TasksProvider>
+              <Header />
+              <main className="flex flex-1 flex-col min-h-0">
+                <div className="mx-auto flex w-full max-w-[1600px] flex-1 flex-col min-h-0 p-4 sm:p-6">
+                  <div className="flex flex-1 flex-col min-h-0 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+                    {children}
+                  </div>
+                </div>
+              </main>
+            </TasksProvider>
+          </AuthGate>
+        </AuthProvider>
       </body>
     </html>
   );

@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { CalendarDays, KanbanSquare, HardHat } from "lucide-react";
+import { CalendarDays, KanbanSquare, HardHat, LogOut } from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
 
 const TABS = [
@@ -12,6 +13,7 @@ const TABS = [
 
 export default function Header() {
   const pathname = usePathname();
+  const { user, signOut } = useAuth();
 
   return (
     <header className="border-b border-slate-200 bg-white shadow-sm">
@@ -28,27 +30,58 @@ export default function Header() {
           </div>
         </div>
 
-        <nav className="flex items-center gap-1 rounded-lg bg-slate-100 p-1">
-          {TABS.map((tab) => {
-            const active = pathname?.startsWith(tab.href);
-            const Icon = tab.icon;
-            return (
-              <Link
-                key={tab.href}
-                href={tab.href}
-                className={cn(
-                  "flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
-                  active
-                    ? "bg-blue-600 text-white shadow-sm"
-                    : "text-slate-500 hover:text-slate-800"
-                )}
+        <div className="flex items-center gap-3">
+          <nav className="flex items-center gap-1 rounded-lg bg-slate-100 p-1">
+            {TABS.map((tab) => {
+              const active = pathname?.startsWith(tab.href);
+              const Icon = tab.icon;
+              return (
+                <Link
+                  key={tab.href}
+                  href={tab.href}
+                  className={cn(
+                    "flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+                    active
+                      ? "bg-blue-600 text-white shadow-sm"
+                      : "text-slate-500 hover:text-slate-800"
+                  )}
+                >
+                  <Icon className="h-4 w-4" />
+                  {tab.label}
+                </Link>
+              );
+            })}
+          </nav>
+
+          {user && (
+            <div className="flex items-center gap-2 border-l border-slate-200 pl-3">
+              {user.photoURL ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={user.photoURL}
+                  alt={user.displayName ?? "Usuario"}
+                  referrerPolicy="no-referrer"
+                  className="h-7 w-7 rounded-full"
+                />
+              ) : (
+                <span className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-200 text-xs font-medium text-slate-600">
+                  {(user.displayName ?? user.email ?? "?").charAt(0).toUpperCase()}
+                </span>
+              )}
+              <span className="hidden text-xs font-medium text-slate-600 sm:inline">
+                {user.displayName ?? user.email}
+              </span>
+              <button
+                onClick={signOut}
+                aria-label="Cerrar sesión"
+                title="Cerrar sesión"
+                className="rounded-md p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
               >
-                <Icon className="h-4 w-4" />
-                {tab.label}
-              </Link>
-            );
-          })}
-        </nav>
+                <LogOut className="h-4 w-4" />
+              </button>
+            </div>
+          )}
+        </div>
       </div>
     </header>
   );

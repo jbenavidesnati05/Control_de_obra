@@ -3,26 +3,15 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // MVP sin autenticación: acceso abierto de lectura/escritura a la
-    // colección "tasks" para que el equipo de interventoría pueda usar la
-    // app sin login. Esto es intencional para esta fase y debe cerrarse
-    // antes de manejar datos sensibles o exponer el proyecto públicamente.
-    match /tasks/{taskId} {
-      allow read, write: if true;
+    // Cada usuario autenticado con Google tiene su propio espacio aislado:
+    // solo el dueño de la cuenta (uid) puede leer o escribir sus tareas.
+    match /users/{userId}/tasks/{taskId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
     }
 
-    // Cualquier otra colección queda cerrada por defecto.
+    // Cualquier otra colección/documento queda cerrado por defecto.
     match /{document=**} {
       allow read, write: if false;
     }
-
-    // --- Fase 2: Firebase Auth (multi-usuario / multi-interventor) ---
-    // Cuando se habilite Firebase Auth, reemplazar la regla de "tasks" por
-    // algo como lo siguiente (ejemplo: cualquier usuario autenticado puede
-    // leer/escribir; se puede refinar por rol o por proyecto más adelante):
-    //
-    // match /tasks/{taskId} {
-    //   allow read, write: if request.auth != null;
-    // }
   }
 }

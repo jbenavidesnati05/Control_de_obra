@@ -7,13 +7,30 @@ import {
   onSnapshot,
   serverTimestamp,
   Timestamp,
+  type CollectionReference,
   type DocumentData,
   type QueryDocumentSnapshot,
 } from "firebase/firestore";
-import { db } from "./firebase";
+import { auth, db } from "./firebase";
 import type { Estado, Task, TaskInput } from "./types";
 
-const TASKS_COLLECTION = "tasks";
+// Cada usuario tiene su propio espacio aislado: users/{uid}/tasks.
+function tasksCollection(uid: string): CollectionReference<DocumentData> {
+  return collection(db, "users", uid, "tasks");
+}
+
+function taskDoc(uid: string, id: string) {
+  return doc(db, "users", uid, "tasks", id);
+}
+
+// Las mutaciones (crear/editar/mover/borrar) solo se disparan desde una UI ya
+// autenticada (todo vive detrás de <AuthGate>), así que basta leer el usuario
+// actual de Auth en vez de pedirle el uid a cada componente que llama esto.
+function requireUid(): string {
+  const uid = auth.currentUser?.uid;
+  if (!uid) throw new Error("Debes iniciar sesión para guardar cambios.");
+  return uid;
+}
 
 function fromFirestore(snap: QueryDocumentSnapshot<DocumentData>): Task {
   const data = snap.data();
@@ -37,9 +54,13 @@ function fromFirestore(snap: QueryDocumentSnapshot<DocumentData>): Task {
   };
 }
 
-// Suscripción en tiempo real a todas las tareas. Devuelve la función de unsubscribe.
-export function subscribeTasks(onChange: (tasks: Task[]) => void, onError?: (err: Error) => void) {
-  const ref = collection(db, TASKS_COLLECTION);
+// Suscripción en tiempo real a las tareas del usuario. Devuelve la función de unsubscribe.
+export function subscribeTasks(
+  uid: string,
+  onChange: (tasks: Task[]) => void,
+  onError?: (err: Error) => void
+) {
+  const ref = tasksCollection(uid);
   return onSnapshot(
     ref,
     (snapshot) => {
@@ -51,7 +72,7 @@ export function subscribeTasks(onChange: (tasks: Task[]) => void, onError?: (err
 }
 
 export async function createTask(input: TaskInput) {
-  const ref = collection(db, TASKS_COLLECTION);
+  const ref = tasksCollection(requireUid());
   await addDoc(ref, {
     ...input,
     fecha: input.fecha ? Timestamp.fromDate(input.fecha) : null,
@@ -61,7 +82,7 @@ export async function createTask(input: TaskInput) {
 }
 
 export async function updateTask(id: string, input: Partial<TaskInput>) {
-  const ref = doc(db, TASKS_COLLECTION, id);
+  const ref = taskDoc(requireUid(), id);
   const { fecha, ...rest } = input;
   await updateDoc(ref, {
     ...rest,
@@ -71,16 +92,16 @@ export async function updateTask(id: string, input: Partial<TaskInput>) {
 }
 
 export async function moveTask(id: string, estado: Estado) {
-  const ref = doc(db, TASKS_COLLECTION, id);
+  const ref = taskDoc(requireUid(), id);
   await updateDoc(ref, { estado, updatedAt: serverTimestamp() });
 }
 
 export async function setEnviado(id: string, enviado: boolean) {
-  const ref = doc(db, TASKS_COLLECTION, id);
+  const ref = taskDoc(requireUid(), id);
   await updateDoc(ref, { enviado, updatedAt: serverTimestamp() });
 }
 
 export async function deleteTask(id: string) {
-  const ref = doc(db, TASKS_COLLECTION, id);
+  const ref = taskDoc(requireUid(), id);
   await deleteDoc(ref);
 }
