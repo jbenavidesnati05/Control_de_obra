@@ -5,7 +5,8 @@ import { Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import Modal from "@/components/ui/Modal";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
-import { createTask, updateTask, deleteTask } from "@/lib/tasks";
+import { createTask, updateTask, updateSerie, deleteTask } from "@/lib/tasks";
+import { useTasks } from "@/hooks/useTasks";
 import { DISCIPLINA_INFO } from "@/lib/disciplinas";
 import { RECURRENCIA_LABEL } from "@/lib/recurrencia";
 import {
@@ -87,6 +88,10 @@ export default function TaskFormModal({
   defaultTipo,
 }: Props) {
   const isEdit = !!task;
+  const { tasks: todasLasTareas } = useTasks();
+  const serieCount = task?.serieId
+    ? todasLasTareas.filter((t) => t.serieId === task.serieId).length
+    : 0;
   const [titulo, setTitulo] = useState(task?.titulo ?? "");
   const [descripcion, setDescripcion] = useState(task?.descripcion ?? "");
   const [disciplina, setDisciplina] = useState(task?.disciplina ?? "ELECTRICO");
@@ -106,6 +111,7 @@ export default function TaskFormModal({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [pendingInput, setPendingInput] = useState<TaskInput | null>(null);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -117,34 +123,48 @@ export default function TaskFormModal({
       setError('Elige la fecha de fin de la serie, o cambia a "Después de N repeticiones".');
       return;
     }
+    const input: TaskInput = {
+      titulo: titulo.trim(),
+      descripcion: descripcion.trim(),
+      disciplina,
+      responsable: responsable.trim(),
+      estado,
+      tipo,
+      fecha: fromDateInputValue(fecha),
+      horaInicio: horaInicio || null,
+      horaFin: horaFin || null,
+      esStopper,
+      recurrencia: recurrencia || null,
+      notas: notas.trim(),
+      enviado,
+    };
+
+    // Si la tarea pertenece a una serie, hay que preguntar el alcance antes
+    // de guardar (igual que Outlook/Teams: "solo este evento" o "toda la serie").
+    if (isEdit && task?.serieId) {
+      setPendingInput(input);
+      return;
+    }
+
     setSaving(true);
     setError(null);
     try {
-      const input: TaskInput = {
-        titulo: titulo.trim(),
-        descripcion: descripcion.trim(),
-        disciplina,
-        responsable: responsable.trim(),
-        estado,
-        tipo,
-        fecha: fromDateInputValue(fecha),
-        horaInicio: horaInicio || null,
-        horaFin: horaFin || null,
-        esStopper,
-        recurrencia: recurrencia || null,
-        notas: notas.trim(),
-        enviado,
-      };
       if (isEdit && task) {
         await updateTask(task.id, input);
         toast.success("Tarea actualizada.");
       } else {
-        await createTask(input);
+        const serieId =
+          recurrencia && input.fecha
+            ? typeof crypto !== "undefined" && crypto.randomUUID
+              ? crypto.randomUUID()
+              : `serie-${Date.now()}`
+            : null;
+        await createTask({ ...input, serieId });
 
-        if (recurrencia && input.fecha) {
+        if (serieId && input.fecha) {
           const fechasSerie = calcularFechasSerie(
             input.fecha,
-            recurrencia,
+            recurrencia as Recurrencia,
             finSerie,
             serieOcurrencias,
             finSerie === "fecha" ? fromDateInputValue(serieHastaFecha) : null
@@ -153,7 +173,7 @@ export default function TaskFormModal({
           let fallidas = 0;
           for (const f of fechasSerie) {
             try {
-              await createTask({ ...input, fecha: f });
+              await createTask({ ...input, fecha: f, serieId });
               creadas++;
             } catch {
               fallidas++;
@@ -168,6 +188,33 @@ export default function TaskFormModal({
           toast.success("Tarea creada.");
         }
       }
+      onClose();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "No se pudo guardar la tarea.";
+      setError(message);
+      toast.error(message);
+      setSaving(false);
+    }
+  }
+
+  async function handleSerieChoice(scope: "solo" | "serie") {
+    if (!pendingInput || !task) return;
+    const input = pendingInput;
+    setPendingInput(null);
+    setSaving(true);
+    setError(null);
+    try {
+      await updateTask(task.id, input);
+      if (scope === "serie" && task.serieId) {
+        const { titulo, descripcion, disciplina, responsable, tipo, horaInicio, horaFin, esStopper, notas } =
+          input;
+        await updateSerie(
+          task.serieId,
+          { titulo, descripcion, disciplina, responsable, tipo, horaInicio, horaFin, esStopper, notas },
+          task.id
+        );
+      }
+      toast.success(scope === "serie" ? "Serie actualizada." : "Tarea actualizada.");
       onClose();
     } catch (err) {
       const message = err instanceof Error ? err.message : "No se pudo guardar la tarea.";
@@ -322,6 +369,13 @@ export default function TaskFormModal({
           </div>
         </div>
 
+        {isEdit && task?.serieId && (
+          <p className="-mt-2 text-xs text-indigo-600">
+            Esta tarea es parte de una serie recurrente ({serieCount} tareas). Al guardar, podrás
+            elegir si el cambio aplica solo aquí o a toda la serie.
+          </p>
+        )}
+
         {!isEdit && recurrencia && (
           <div className="rounded-lg border border-indigo-100 bg-indigo-50/50 p-3">
             <p className="mb-2 text-xs font-medium text-indigo-700">
@@ -450,6 +504,44 @@ export default function TaskFormModal({
           onConfirm={handleDelete}
           onCancel={() => setConfirmingDelete(false)}
         />
+      )}
+
+      {pendingInput && task?.serieId && (
+        <Modal title="Guardar cambios" onClose={() => setPendingInput(null)} widthClass="max-w-sm">
+          <p className="text-sm text-slate-600">
+            Esta tarea es parte de una serie recurrente ({serieCount} tareas en total). ¿Dónde
+            quieres aplicar los cambios?
+          </p>
+          <p className="mt-2 text-xs text-slate-400">
+            La fecha, el estado y "Enviado" siempre quedan solo en esta tarea; el resto de campos
+            (título, disciplina, responsable, horas, notas...) se pueden replicar a toda la serie.
+          </p>
+          <div className="mt-4 flex flex-col gap-2">
+            <button
+              type="button"
+              onClick={() => handleSerieChoice("solo")}
+              className="rounded-lg border border-slate-300 px-4 py-2.5 text-left text-sm font-medium text-slate-700 hover:bg-slate-50"
+            >
+              Solo esta tarea
+            </button>
+            <button
+              type="button"
+              onClick={() => handleSerieChoice("serie")}
+              className="rounded-lg bg-blue-600 px-4 py-2.5 text-left text-sm font-medium text-white shadow-sm hover:bg-blue-700"
+            >
+              Toda la serie ({serieCount})
+            </button>
+          </div>
+          <div className="mt-3 flex justify-end">
+            <button
+              type="button"
+              onClick={() => setPendingInput(null)}
+              className="rounded-md px-3 py-2 text-sm font-medium text-slate-500 hover:bg-slate-100"
+            >
+              Cancelar
+            </button>
+          </div>
+        </Modal>
       )}
     </Modal>
   );

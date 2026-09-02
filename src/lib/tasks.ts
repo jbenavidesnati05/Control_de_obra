@@ -4,15 +4,34 @@ import {
   updateDoc,
   deleteDoc,
   doc,
+  getDocs,
   onSnapshot,
+  query,
   serverTimestamp,
   Timestamp,
+  where,
   type CollectionReference,
   type DocumentData,
   type QueryDocumentSnapshot,
 } from "firebase/firestore";
 import { auth, db } from "./firebase";
 import type { Estado, Task, TaskInput } from "./types";
+
+// Campos que tiene sentido replicar a toda una serie recurrente al editar
+// "toda la serie": deliberadamente NO incluye fecha/estado/enviado, que son
+// propios de cada ocurrencia (cada comité/entregable avanza por su cuenta).
+export type SerieUpdateFields = Pick<
+  TaskInput,
+  | "titulo"
+  | "descripcion"
+  | "disciplina"
+  | "responsable"
+  | "tipo"
+  | "horaInicio"
+  | "horaFin"
+  | "esStopper"
+  | "notas"
+>;
 
 // Cada usuario tiene su propio espacio aislado: users/{uid}/tasks.
 function tasksCollection(uid: string): CollectionReference<DocumentData> {
@@ -49,6 +68,7 @@ function fromFirestore(snap: QueryDocumentSnapshot<DocumentData>): Task {
     recurrencia: data.recurrencia ?? null,
     notas: data.notas ?? "",
     enviado: !!data.enviado,
+    serieId: data.serieId ?? null,
     createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate() : undefined,
     updatedAt: data.updatedAt instanceof Timestamp ? data.updatedAt.toDate() : undefined,
   };
@@ -104,4 +124,17 @@ export async function setEnviado(id: string, enviado: boolean) {
 export async function deleteTask(id: string) {
   const ref = taskDoc(requireUid(), id);
   await deleteDoc(ref);
+}
+
+// Replica los campos "compartidos" (no la fecha/estado/enviado, que son por
+// ocurrencia) a todas las demás tareas de la misma serie recurrente.
+export async function updateSerie(serieId: string, changes: SerieUpdateFields, excludeId?: string) {
+  const uid = requireUid();
+  const q = query(tasksCollection(uid), where("serieId", "==", serieId));
+  const snapshot = await getDocs(q);
+  await Promise.all(
+    snapshot.docs
+      .filter((d) => d.id !== excludeId)
+      .map((d) => updateDoc(d.ref, { ...changes, updatedAt: serverTimestamp() }))
+  );
 }

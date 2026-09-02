@@ -86,6 +86,9 @@ export interface Task {
   notas?: string;
   // Solo aplica a tipo ENTREGABLE: control de cumplimiento de envío.
   enviado?: boolean;
+  // Comparte este id con las demás tareas creadas en la misma serie
+  // recurrente (ver TaskFormModal). null/ausente = tarea suelta, sin serie.
+  serieId?: string | null;
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -105,4 +108,5 @@ export interface TaskInput {
   recurrencia?: Recurrencia | null;
   notas?: string;
   enviado?: boolean;
+  serieId?: string | null;
 }
