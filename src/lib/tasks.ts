@@ -17,6 +17,8 @@ import {
 import { auth, db } from "./firebase";
 import type { Estado, Task, TaskInput } from "./types";
 
+export const PUNTAJE_POR_TAREA = 50;
+
 // Campos que tiene sentido replicar a toda una serie recurrente al editar
 // "toda la serie": deliberadamente NO incluye fecha/estado/enviado, que son
 // propios de cada ocurrencia (cada comité/entregable avanza por su cuenta).
@@ -69,6 +71,9 @@ function fromFirestore(snap: QueryDocumentSnapshot<DocumentData>): Task {
     notas: data.notas ?? "",
     enviado: !!data.enviado,
     serieId: data.serieId ?? null,
+    orden: typeof data.orden === "number" ? data.orden : undefined,
+    puntaje: typeof data.puntaje === "number" ? data.puntaje : PUNTAJE_POR_TAREA,
+    cerradaEn: data.cerradaEn instanceof Timestamp ? data.cerradaEn.toDate() : null,
     createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate() : undefined,
     updatedAt: data.updatedAt instanceof Timestamp ? data.updatedAt.toDate() : undefined,
   };
@@ -96,6 +101,11 @@ export async function createTask(input: TaskInput) {
   await addDoc(ref, {
     ...input,
     fecha: input.fecha ? Timestamp.fromDate(input.fecha) : null,
+    // Al crear, siempre queda de última en su columna (mayor = más abajo);
+    // Date.now() como valor produce "apilado por orden de creación" gratis.
+    orden: Date.now(),
+    puntaje: PUNTAJE_POR_TAREA,
+    cerradaEn: input.estado === "CERRADA" ? serverTimestamp() : null,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   });
@@ -103,17 +113,28 @@ export async function createTask(input: TaskInput) {
 
 export async function updateTask(id: string, input: Partial<TaskInput>) {
   const ref = taskDoc(requireUid(), id);
-  const { fecha, ...rest } = input;
+  const { fecha, estado, ...rest } = input;
   await updateDoc(ref, {
     ...rest,
     ...(fecha !== undefined ? { fecha: fecha ? Timestamp.fromDate(fecha) : null } : {}),
+    // cerradaEn decide a qué semana se abona el puntaje; se limpia si se
+    // reabre para que no quede "pegada" a una semana vieja.
+    ...(estado !== undefined
+      ? { estado, cerradaEn: estado === "CERRADA" ? serverTimestamp() : null }
+      : {}),
     updatedAt: serverTimestamp(),
   });
 }
 
-export async function moveTask(id: string, estado: Estado) {
+// Mueve una tarea a otra columna y/o le asigna una nueva posición manual
+// dentro de la columna (arrastrar y soltar en el Kanban).
+export async function reorderTask(id: string, orden: number, estado?: Estado) {
   const ref = taskDoc(requireUid(), id);
-  await updateDoc(ref, { estado, updatedAt: serverTimestamp() });
+  await updateDoc(ref, {
+    orden,
+    ...(estado ? { estado, cerradaEn: estado === "CERRADA" ? serverTimestamp() : null } : {}),
+    updatedAt: serverTimestamp(),
+  });
 }
 
 export async function setEnviado(id: string, enviado: boolean) {
@@ -124,6 +145,15 @@ export async function setEnviado(id: string, enviado: boolean) {
 export async function deleteTask(id: string) {
   const ref = taskDoc(requireUid(), id);
   await deleteDoc(ref);
+}
+
+// Borra todas las tareas de la misma serie recurrente (incluida la que
+// disparó la acción).
+export async function deleteSerie(serieId: string) {
+  const uid = requireUid();
+  const q = query(tasksCollection(uid), where("serieId", "==", serieId));
+  const snapshot = await getDocs(q);
+  await Promise.all(snapshot.docs.map((d) => deleteDoc(d.ref)));
 }
 
 // Replica los campos "compartidos" (no la fecha/estado/enviado, que son por

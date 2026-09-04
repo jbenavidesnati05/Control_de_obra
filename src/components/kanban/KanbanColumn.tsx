@@ -1,6 +1,7 @@
 "use client";
 
 import { useDroppable } from "@dnd-kit/core";
+import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { cn } from "@/lib/utils";
 import type { Estado, Task } from "@/lib/types";
 import KanbanCard from "./KanbanCard";
@@ -50,14 +51,16 @@ export default function KanbanColumn({
         {tasks.length === 0 && (
           <p className="mt-4 text-center text-xs text-slate-400">Sin tareas</p>
         )}
-        {tasks.map((task) => (
-          <KanbanCard
-            key={task.id}
-            task={task}
-            onClick={() => onCardClick(task)}
-            onRequestDelete={() => onDeleteRequest(task)}
-          />
-        ))}
+        <SortableContext items={tasks.map((t) => t.id)} strategy={verticalListSortingStrategy}>
+          {tasks.map((task) => (
+            <KanbanCard
+              key={task.id}
+              task={task}
+              onClick={() => onCardClick(task)}
+              onRequestDelete={() => onDeleteRequest(task)}
+            />
+          ))}
+        </SortableContext>
       </div>
     </div>
   );

@@ -1,12 +1,13 @@
 "use client";
 
-import { useDraggable } from "@dnd-kit/core";
+import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { AlertTriangle, CalendarDays, Repeat, Trash2, User } from "lucide-react";
+import { AlertTriangle, CalendarDays, Clock, Repeat, Trash2, User } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import DisciplinaChip from "@/components/tasks/DisciplinaChip";
 import { disciplinaInfo } from "@/lib/disciplinas";
+import { colorEstancamiento, diasSinGestion } from "@/lib/taskStatus";
 import { isPast, cn } from "@/lib/utils";
 import { RECURRENCIA_LABEL_CORTO } from "@/lib/recurrencia";
 import { ESTADOS_FINALES, type Task } from "@/lib/types";
@@ -23,6 +24,8 @@ interface Props {
 export function KanbanCardBody({ task }: { task: Task }) {
   const info = disciplinaInfo(task.disciplina);
   const vencida = task.fecha && !ESTADOS_FINALES.includes(task.estado) && isPast(task.fecha);
+  const dias = diasSinGestion(task);
+  const estancamiento = colorEstancamiento(task);
 
   return (
     <>
@@ -37,6 +40,16 @@ export function KanbanCardBody({ task }: { task: Task }) {
         {vencida && (
           <span className="rounded-full bg-red-600 px-1.5 py-0.5 text-[10px] font-semibold text-white">
             VENCIDA
+          </span>
+        )}
+        {estancamiento && (
+          <span
+            className="inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[10px] font-semibold"
+            style={{ backgroundColor: estancamiento.bg, color: estancamiento.text }}
+            title={`${dias} día${dias === 1 ? "" : "s"} sin gestionar`}
+          >
+            <Clock className="h-2.5 w-2.5" />
+            {dias}d
           </span>
         )}
         {task.recurrencia && (
@@ -73,9 +86,13 @@ export function KanbanCardBody({ task }: { task: Task }) {
 export function KanbanCardOverlay({ task }: { task: Task }) {
   const info = disciplinaInfo(task.disciplina);
   const cerrada = task.estado === "CERRADA";
+  const estancamiento = colorEstancamiento(task);
   return (
     <div
-      style={{ borderLeftColor: info.color }}
+      style={{
+        borderLeftColor: estancamiento?.ring ?? info.color,
+        backgroundColor: estancamiento?.bg,
+      }}
       className={cn(
         "cursor-grabbing rounded-xl border border-slate-200 border-l-4 bg-white p-3 shadow-xl ring-1 ring-black/5",
         cerrada && "grayscale opacity-75"
@@ -87,15 +104,18 @@ export function KanbanCardOverlay({ task }: { task: Task }) {
 }
 
 export default function KanbanCard({ task, onClick, onRequestDelete }: Props) {
-  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: task.id,
   });
   const info = disciplinaInfo(task.disciplina);
   const cerrada = task.estado === "CERRADA";
+  const estancamiento = colorEstancamiento(task);
 
   const style = {
-    transform: CSS.Translate.toString(transform),
-    borderLeftColor: info.color,
+    transform: CSS.Transform.toString(transform),
+    transition,
+    borderLeftColor: estancamiento?.ring ?? info.color,
+    backgroundColor: estancamiento?.bg,
   };
 
   return (

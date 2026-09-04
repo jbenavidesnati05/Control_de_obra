@@ -6,8 +6,9 @@ import { es } from "date-fns/locale";
 import { AlertTriangle, Check, Clock, Plus, Repeat, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import DisciplinaChip from "@/components/tasks/DisciplinaChip";
-import ConfirmDialog from "@/components/ui/ConfirmDialog";
-import { deleteTask, setEnviado } from "@/lib/tasks";
+import DeleteTaskDialog from "@/components/tasks/DeleteTaskDialog";
+import { deleteTask, deleteSerie, setEnviado } from "@/lib/tasks";
+import { useTasks } from "@/hooks/useTasks";
 import { tipoColor } from "@/lib/tipoColor";
 import { isVencida, isProximo } from "@/lib/taskStatus";
 import { festivoEn, esFinDeSemana } from "@/lib/festivosColombia";
@@ -24,6 +25,7 @@ interface Props {
 }
 
 export default function DayPanel({ date, tasks, onClose, onAdd, onSelectTask }: Props) {
+  const { tasks: todasLasTareas } = useTasks();
   const sorted = [...tasks].sort((a, b) => a.titulo.localeCompare(b.titulo));
   const [deletingTask, setDeletingTask] = useState<Task | null>(null);
   const festivo = festivoEn(date);
@@ -38,6 +40,18 @@ export default function DayPanel({ date, tasks, onClose, onAdd, onSelectTask }: 
       toast.success("Tarea eliminada.");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "No se pudo eliminar la tarea.");
+    }
+  }
+
+  async function handleDeleteSerie() {
+    if (!deletingTask?.serieId) return;
+    const { serieId } = deletingTask;
+    setDeletingTask(null);
+    try {
+      await deleteSerie(serieId);
+      toast.success("Serie eliminada.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "No se pudo eliminar la serie.");
     }
   }
 
@@ -191,12 +205,15 @@ export default function DayPanel({ date, tasks, onClose, onAdd, onSelectTask }: 
       </div>
 
       {deletingTask && (
-        <ConfirmDialog
-          title="Eliminar tarea"
-          message={`¿Eliminar "${deletingTask.titulo}"? Esta acción no se puede deshacer.`}
-          confirmLabel="Eliminar"
-          danger
-          onConfirm={handleDelete}
+        <DeleteTaskDialog
+          task={deletingTask}
+          serieCount={
+            deletingTask.serieId
+              ? todasLasTareas.filter((t) => t.serieId === deletingTask.serieId).length
+              : 0
+          }
+          onDeleteOne={handleDelete}
+          onDeleteSerie={handleDeleteSerie}
           onCancel={() => setDeletingTask(null)}
         />
       )}

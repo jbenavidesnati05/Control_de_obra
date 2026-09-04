@@ -89,6 +89,15 @@ export interface Task {
   // Comparte este id con las demás tareas creadas en la misma serie
   // recurrente (ver TaskFormModal). null/ausente = tarea suelta, sin serie.
   serieId?: string | null;
+  // Orden manual dentro de su columna (menor = más prioritaria/arriba). Se
+  // asigna al crear (Date.now()) y se recalcula al arrastrar en el tablero;
+  // si falta (datos viejos), se usa createdAt como respaldo al ordenar.
+  orden?: number;
+  // Puntos que suma al marcarse "Cerrada" (por defecto 50 por tarea).
+  puntaje?: number;
+  // Fecha en la que quedó "Cerrada" por última vez; se limpia si se reabre.
+  // Es lo que decide a qué semana se le abona el puntaje.
+  cerradaEn?: Date | null;
   createdAt?: Date;
   updatedAt?: Date;
 }

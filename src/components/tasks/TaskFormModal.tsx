@@ -4,8 +4,8 @@ import { useState } from "react";
 import { Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import Modal from "@/components/ui/Modal";
-import ConfirmDialog from "@/components/ui/ConfirmDialog";
-import { createTask, updateTask, updateSerie, deleteTask } from "@/lib/tasks";
+import DeleteTaskDialog from "./DeleteTaskDialog";
+import { createTask, updateTask, updateSerie, deleteTask, deleteSerie } from "@/lib/tasks";
 import { useTasks } from "@/hooks/useTasks";
 import { DISCIPLINA_INFO } from "@/lib/disciplinas";
 import { RECURRENCIA_LABEL } from "@/lib/recurrencia";
@@ -240,6 +240,22 @@ export default function TaskFormModal({
     }
   }
 
+  async function handleDeleteSerie() {
+    if (!task?.serieId) return;
+    setConfirmingDelete(false);
+    setSaving(true);
+    try {
+      await deleteSerie(task.serieId);
+      toast.success("Serie eliminada.");
+      onClose();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "No se pudo eliminar la serie.";
+      setError(message);
+      toast.error(message);
+      setSaving(false);
+    }
+  }
+
   return (
     <Modal title={isEdit ? "Editar tarea" : "Nueva tarea"} onClose={onClose}>
       <form onSubmit={handleSubmit} className="space-y-4">
@@ -254,15 +270,17 @@ export default function TaskFormModal({
           />
         </div>
 
-        <div>
-          <label className="mb-1 block text-xs font-medium text-slate-600">Descripción</label>
-          <input
-            value={descripcion}
-            onChange={(e) => setDescripcion(e.target.value)}
-            placeholder="Breve descripción (opcional)"
-            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-          />
-        </div>
+        {isEdit && (
+          <div>
+            <label className="mb-1 block text-xs font-medium text-slate-600">Descripción</label>
+            <input
+              value={descripcion}
+              onChange={(e) => setDescripcion(e.target.value)}
+              placeholder="Breve descripción (opcional)"
+              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            />
+          </div>
+        )}
 
         <div className="grid grid-cols-2 gap-3">
           <div>
@@ -337,21 +355,23 @@ export default function TaskFormModal({
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="mb-1 block text-xs font-medium text-slate-600">Estado</label>
-            <select
-              value={estado}
-              onChange={(e) => setEstado(e.target.value as Task["estado"])}
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-            >
-              {ESTADOS.map((s) => (
-                <option key={s} value={s}>
-                  {ESTADO_LABEL[s]}
-                </option>
-              ))}
-            </select>
-          </div>
+        <div className={isEdit ? "grid grid-cols-2 gap-3" : ""}>
+          {isEdit && (
+            <div>
+              <label className="mb-1 block text-xs font-medium text-slate-600">Estado</label>
+              <select
+                value={estado}
+                onChange={(e) => setEstado(e.target.value as Task["estado"])}
+                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              >
+                {ESTADOS.map((s) => (
+                  <option key={s} value={s}>
+                    {ESTADO_LABEL[s]}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
           <div>
             <label className="mb-1 block text-xs font-medium text-slate-600">Se repite</label>
             <select
@@ -427,15 +447,17 @@ export default function TaskFormModal({
           </div>
         )}
 
-        <label className="flex items-center gap-2 text-sm text-slate-700">
-          <input
-            type="checkbox"
-            checked={esStopper}
-            onChange={(e) => setEsStopper(e.target.checked)}
-            className="h-4 w-4 rounded border-slate-300 text-red-600 focus:ring-red-500"
-          />
-          Es <span className="font-semibold text-red-600">stopper</span>
-        </label>
+        {isEdit && (
+          <label className="flex items-center gap-2 text-sm text-slate-700">
+            <input
+              type="checkbox"
+              checked={esStopper}
+              onChange={(e) => setEsStopper(e.target.checked)}
+              className="h-4 w-4 rounded border-slate-300 text-red-600 focus:ring-red-500"
+            />
+            Es <span className="font-semibold text-red-600">stopper</span>
+          </label>
+        )}
 
         {tipo === "ENTREGABLE" && (
           <label className="flex items-center gap-2 text-sm text-slate-700">
@@ -449,16 +471,18 @@ export default function TaskFormModal({
           </label>
         )}
 
-        <div>
-          <label className="mb-1 block text-xs font-medium text-slate-600">Notas</label>
-          <textarea
-            value={notas}
-            onChange={(e) => setNotas(e.target.value)}
-            rows={2}
-            placeholder="Detalles adicionales, próximos pasos..."
-            className="w-full resize-none rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-          />
-        </div>
+        {isEdit && (
+          <div>
+            <label className="mb-1 block text-xs font-medium text-slate-600">Notas</label>
+            <textarea
+              value={notas}
+              onChange={(e) => setNotas(e.target.value)}
+              rows={2}
+              placeholder="Detalles adicionales, próximos pasos..."
+              className="w-full resize-none rounded-lg border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            />
+          </div>
+        )}
 
         {error && <p className="text-sm text-red-600">{error}</p>}
 
@@ -496,12 +520,11 @@ export default function TaskFormModal({
       </form>
 
       {confirmingDelete && task && (
-        <ConfirmDialog
-          title="Eliminar tarea"
-          message={`¿Eliminar "${task.titulo}"? Esta acción no se puede deshacer.`}
-          confirmLabel="Eliminar"
-          danger
-          onConfirm={handleDelete}
+        <DeleteTaskDialog
+          task={task}
+          serieCount={serieCount}
+          onDeleteOne={handleDelete}
+          onDeleteSerie={handleDeleteSerie}
           onCancel={() => setConfirmingDelete(false)}
         />
       )}

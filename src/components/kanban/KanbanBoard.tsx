@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import {
+  closestCenter,
   DndContext,
   DragOverlay,
   type DragEndEvent,
@@ -13,7 +14,7 @@ import {
 import { Plus } from "lucide-react";
 import { toast } from "sonner";
 import { useTasks } from "@/hooks/useTasks";
-import { deleteTask, moveTask } from "@/lib/tasks";
+import { deleteTask, deleteSerie, reorderTask } from "@/lib/tasks";
 import {
   ESTADOS,
   DISCIPLINAS,
@@ -26,8 +27,9 @@ import { disciplinaInfo } from "@/lib/disciplinas";
 import KanbanColumn from "./KanbanColumn";
 import KanbanFilters from "./KanbanFilters";
 import { KanbanCardOverlay } from "./KanbanCard";
+import WeeklyScoreBadge from "./WeeklyScoreBadge";
 import TaskFormModal from "@/components/tasks/TaskFormModal";
-import ConfirmDialog from "@/components/ui/ConfirmDialog";
+import DeleteTaskDialog from "@/components/tasks/DeleteTaskDialog";
 
 const ESTADO_TITLE: Record<Estado, string> = {
   POR_HACER: "Por hacer",
@@ -80,10 +82,16 @@ export default function KanbanBoard() {
     });
   }, [tareasDeTrabajo, disciplinaFiltro, responsableFiltro]);
 
+  // Orden manual (arrastrar en el tablero) con respaldo a orden de creación
+  // para tareas viejas que todavía no tienen "orden" asignado.
+  function ordenDe(t: Task): number {
+    return t.orden ?? t.createdAt?.getTime() ?? 0;
+  }
+
   function tasksFor(estado: Estado, disciplina?: Disciplina) {
-    return filtered.filter(
-      (t) => t.estado === estado && (disciplina ? t.disciplina === disciplina : true)
-    );
+    return filtered
+      .filter((t) => t.estado === estado && (disciplina ? t.disciplina === disciplina : true))
+      .sort((a, b) => ordenDe(a) - ordenDe(b));
   }
 
   function handleDragStart(event: DragStartEvent) {
@@ -95,11 +103,34 @@ export default function KanbanBoard() {
     setActiveTask(null);
     const { active, over } = event;
     if (!over) return;
-    const nuevoEstado = over.id as Estado;
-    const task = tasks.find((t) => t.id === active.id);
-    if (!task || task.estado === nuevoEstado) return;
+
+    const activeTask = tasks.find((t) => t.id === active.id);
+    if (!activeTask) return;
+
+    // over.id es el id de la columna (ESTADOS) cuando se suelta en un espacio
+    // vacío, o el id de otra tarjeta cuando se suelta cerca/sobre otra.
+    const overIsColumn = (ESTADOS as string[]).includes(String(over.id));
+    const overTask = overIsColumn ? null : tasks.find((t) => t.id === over.id);
+    const targetEstado: Estado = overIsColumn
+      ? (over.id as Estado)
+      : (overTask?.estado ?? activeTask.estado);
+
+    const destino = tasksFor(targetEstado).filter((t) => t.id !== activeTask.id);
+    const index = overTask ? destino.findIndex((t) => t.id === overTask.id) : destino.length;
+    const before = index > 0 ? destino[index - 1] : undefined;
+    const after = index >= 0 && index < destino.length ? destino[index] : undefined;
+
+    let nuevoOrden: number;
+    if (before && after) nuevoOrden = (ordenDe(before) + ordenDe(after)) / 2;
+    else if (before) nuevoOrden = ordenDe(before) + 1000;
+    else if (after) nuevoOrden = ordenDe(after) - 1000;
+    else nuevoOrden = Date.now();
+
+    const cambiaEstado = targetEstado !== activeTask.estado;
+    if (!cambiaEstado && nuevoOrden === ordenDe(activeTask)) return;
+
     try {
-      await moveTask(task.id, nuevoEstado);
+      await reorderTask(activeTask.id, nuevoOrden, cambiaEstado ? targetEstado : undefined);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "No se pudo mover la tarea.");
     }
@@ -117,6 +148,18 @@ export default function KanbanBoard() {
     }
   }
 
+  async function handleConfirmDeleteSerie() {
+    if (!deletingTask?.serieId) return;
+    const { serieId } = deletingTask;
+    setDeletingTask(null);
+    try {
+      await deleteSerie(serieId);
+      toast.success("Serie eliminada.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "No se pudo eliminar la serie.");
+    }
+  }
+
   const disciplinasConTareas = agrupar
     ? DISCIPLINAS.filter((d) => filtered.some((t) => t.disciplina === d))
     : [];
@@ -125,13 +168,16 @@ export default function KanbanBoard() {
     <div className="flex flex-1 flex-col min-h-0">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-4 py-3 sm:px-6">
         <h1 className="text-base font-semibold text-slate-900">Tablero de tareas</h1>
-        <button
-          onClick={() => setCreatingEstado("POR_HACER")}
-          className="flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-medium text-white shadow-sm hover:bg-blue-700"
-        >
-          <Plus className="h-4 w-4" />
-          Nueva tarea
-        </button>
+        <div className="flex items-center gap-3">
+          <WeeklyScoreBadge tasks={tasks} />
+          <button
+            onClick={() => setCreatingEstado("POR_HACER")}
+            className="flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-medium text-white shadow-sm hover:bg-blue-700"
+          >
+            <Plus className="h-4 w-4" />
+            Nueva tarea
+          </button>
+        </div>
       </div>
 
       <KanbanFilters
@@ -158,6 +204,7 @@ export default function KanbanBoard() {
         ) : (
           <DndContext
             sensors={sensors}
+            collisionDetection={closestCenter}
             onDragStart={handleDragStart}
             onDragEnd={handleDragEnd}
             onDragCancel={() => setActiveTask(null)}
@@ -214,12 +261,15 @@ export default function KanbanBoard() {
         <TaskFormModal defaultEstado={creatingEstado} onClose={() => setCreatingEstado(null)} />
       )}
       {deletingTask && (
-        <ConfirmDialog
-          title="Eliminar tarea"
-          message={`¿Eliminar "${deletingTask.titulo}"? Esta acción no se puede deshacer.`}
-          confirmLabel="Eliminar"
-          danger
-          onConfirm={handleConfirmDelete}
+        <DeleteTaskDialog
+          task={deletingTask}
+          serieCount={
+            deletingTask.serieId
+              ? tasks.filter((t) => t.serieId === deletingTask.serieId).length
+              : 0
+          }
+          onDeleteOne={handleConfirmDelete}
+          onDeleteSerie={handleConfirmDeleteSerie}
           onCancel={() => setDeletingTask(null)}
         />
       )}
