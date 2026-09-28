@@ -2,10 +2,13 @@
 
 import { useMemo, useState } from "react";
 import {
-  closestCenter,
   DndContext,
   DragOverlay,
+  pointerWithin,
+  rectIntersection,
+  type CollisionDetection,
   type DragEndEvent,
+  type DragOverEvent,
   type DragStartEvent,
   PointerSensor,
   useSensor,
@@ -31,19 +34,26 @@ import WeeklyScoreBadge from "./WeeklyScoreBadge";
 import TaskFormModal from "@/components/tasks/TaskFormModal";
 import DeleteTaskDialog from "@/components/tasks/DeleteTaskDialog";
 
+// closestCenter elige el droppable más cercano por centro de rectángulo, lo
+// que con columnas de tamaños/posiciones distintas activa la equivocada de
+// forma inconsistente. Preferimos "dónde está literalmente el cursor"
+// (pointerWithin) y solo si eso no encuentra nada (p. ej. el cursor salió
+// del área de cualquier columna) caemos a rectIntersection como respaldo.
+const collisionDetectionStrategy: CollisionDetection = (args) => {
+  const pointerCollisions = pointerWithin(args);
+  if (pointerCollisions.length > 0) return pointerCollisions;
+  return rectIntersection(args);
+};
+
 const ESTADO_TITLE: Record<Estado, string> = {
   POR_HACER: "Por hacer",
-  EN_ANALISIS: "En análisis",
-  EN_GESTION: "En gestión",
-  HECHA: "Hecha",
+  EN_PROCESO: "En proceso",
   CERRADA: "Cerrada",
 };
 
 const ESTADO_ACCENT: Record<Estado, string> = {
   POR_HACER: "#94a3b8",
-  EN_ANALISIS: "#6366f1",
-  EN_GESTION: "#f59e0b",
-  HECHA: "#10b981",
+  EN_PROCESO: "#f59e0b",
   CERRADA: "#475569",
 };
 
@@ -56,6 +66,7 @@ export default function KanbanBoard() {
   const [creatingEstado, setCreatingEstado] = useState<Estado | null>(null);
   const [deletingTask, setDeletingTask] = useState<Task | null>(null);
   const [activeTask, setActiveTask] = useState<Task | null>(null);
+  const [overEstado, setOverEstado] = useState<Estado | null>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } })
@@ -99,8 +110,28 @@ export default function KanbanBoard() {
     setActiveTask(task ?? null);
   }
 
+  // El `isOver` del useDroppable de cada columna solo es true sobre su
+  // espacio vacío, no al pasar sobre una tarjeta (que es casi toda el área
+  // de una columna con contenido). Por eso calculamos aquí "sobre qué
+  // columna está el drag" y se lo pasamos a cada KanbanColumn para resaltarla.
+  function handleDragOver(event: DragOverEvent) {
+    const { over } = event;
+    if (!over) {
+      setOverEstado(null);
+      return;
+    }
+    const overIsColumn = (ESTADOS as string[]).includes(String(over.id));
+    if (overIsColumn) {
+      setOverEstado(over.id as Estado);
+      return;
+    }
+    const overTask = tasks.find((t) => t.id === over.id);
+    setOverEstado(overTask?.estado ?? null);
+  }
+
   async function handleDragEnd(event: DragEndEvent) {
     setActiveTask(null);
+    setOverEstado(null);
     const { active, over } = event;
     if (!over) return;
 
@@ -204,10 +235,14 @@ export default function KanbanBoard() {
         ) : (
           <DndContext
             sensors={sensors}
-            collisionDetection={closestCenter}
+            collisionDetection={collisionDetectionStrategy}
             onDragStart={handleDragStart}
+            onDragOver={handleDragOver}
             onDragEnd={handleDragEnd}
-            onDragCancel={() => setActiveTask(null)}
+            onDragCancel={() => {
+              setActiveTask(null);
+              setOverEstado(null);
+            }}
           >
             {agrupar ? (
               <div className="flex flex-col gap-6">
@@ -219,7 +254,7 @@ export default function KanbanBoard() {
                         <span className="h-2 w-2 rounded-full" style={{ backgroundColor: info.color }} />
                         <h3 className="text-sm font-semibold text-slate-700">{info.label}</h3>
                       </div>
-                      <div className="flex gap-3">
+                      <div className="mx-auto flex w-full max-w-[75%] gap-3">
                         {ESTADOS.map((estado) => (
                           <KanbanColumn
                             key={estado}
@@ -229,6 +264,7 @@ export default function KanbanBoard() {
                             tasks={tasksFor(estado, d)}
                             onCardClick={setEditingTask}
                             onDeleteRequest={setDeletingTask}
+                            overEstado={overEstado}
                           />
                         ))}
                       </div>
@@ -237,7 +273,7 @@ export default function KanbanBoard() {
                 })}
               </div>
             ) : (
-              <div className="flex h-full gap-3">
+              <div className="mx-auto flex h-full w-full max-w-[75%] gap-3">
                 {ESTADOS.map((estado) => (
                   <KanbanColumn
                     key={estado}
@@ -247,6 +283,7 @@ export default function KanbanBoard() {
                     tasks={tasksFor(estado)}
                     onCardClick={setEditingTask}
                     onDeleteRequest={setDeletingTask}
+                    overEstado={overEstado}
                   />
                 ))}
               </div>

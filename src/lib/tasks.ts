@@ -53,6 +53,20 @@ function requireUid(): string {
   return uid;
 }
 
+// El tablero pasó de 5 columnas a 3 (Por hacer / En proceso / Cerrada). Las
+// tareas viejas guardadas con los estados anteriores se re-mapean solo al
+// leer (no se reescribe nada en Firestore); en cuanto alguien las mueva de
+// nuevo desde el tablero, quedan guardadas ya con el estado nuevo.
+const ESTADO_LEGADO: Record<string, Estado> = {
+  EN_ANALISIS: "EN_PROCESO",
+  EN_GESTION: "EN_PROCESO",
+  HECHA: "CERRADA",
+};
+
+function normalizarEstado(raw: string): Estado {
+  return (ESTADO_LEGADO[raw] as Estado) ?? (raw as Estado);
+}
+
 function fromFirestore(snap: QueryDocumentSnapshot<DocumentData>): Task {
   const data = snap.data();
   return {
@@ -61,7 +75,7 @@ function fromFirestore(snap: QueryDocumentSnapshot<DocumentData>): Task {
     descripcion: data.descripcion ?? "",
     disciplina: data.disciplina,
     responsable: data.responsable ?? "",
-    estado: data.estado,
+    estado: normalizarEstado(data.estado),
     tipo: data.tipo,
     fecha: data.fecha instanceof Timestamp ? data.fecha.toDate() : null,
     horaInicio: data.horaInicio ?? null,

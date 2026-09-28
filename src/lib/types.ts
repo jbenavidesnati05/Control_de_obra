@@ -10,7 +10,7 @@ export type Disciplina =
   | "SEGURIDAD"
   | "TRANSVERSAL";
 
-export type Estado = "POR_HACER" | "EN_ANALISIS" | "EN_GESTION" | "HECHA" | "CERRADA";
+export type Estado = "POR_HACER" | "EN_PROCESO" | "CERRADA";
 
 export type Tipo =
   | "TAREA"
@@ -53,11 +53,11 @@ export const DISCIPLINAS: Disciplina[] = [
   "TRANSVERSAL",
 ];
 
-export const ESTADOS: Estado[] = ["POR_HACER", "EN_ANALISIS", "EN_GESTION", "HECHA", "CERRADA"];
+export const ESTADOS: Estado[] = ["POR_HACER", "EN_PROCESO", "CERRADA"];
 
 // Estados que se consideran "terminados" para efectos de vencimiento
 // (una tarea con fecha pasada en uno de estos estados ya no se marca como vencida).
-export const ESTADOS_FINALES: Estado[] = ["HECHA", "CERRADA"];
+export const ESTADOS_FINALES: Estado[] = ["CERRADA"];
 
 export const TIPOS: Tipo[] = [
   "TAREA",

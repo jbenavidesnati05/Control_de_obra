@@ -13,6 +13,12 @@ interface Props {
   tasks: Task[];
   onCardClick: (task: Task) => void;
   onDeleteRequest: (task: Task) => void;
+  // Columna sobre la que está el drag activo ahora mismo, calculada en
+  // KanbanBoard (ver comentario ahí). No basta el `isOver` del propio
+  // useDroppable: ese solo es true al pasar por el espacio vacío, no al
+  // pasar sobre otra tarjeta (que es casi toda el área de una columna con
+  // contenido), y por eso el resaltado no se activaba.
+  overEstado: Estado | null;
 }
 
 export default function KanbanColumn({
@@ -22,16 +28,28 @@ export default function KanbanColumn({
   tasks,
   onCardClick,
   onDeleteRequest,
+  overEstado,
 }: Props) {
-  const { setNodeRef, isOver } = useDroppable({ id: estado });
+  const { setNodeRef } = useDroppable({ id: estado });
+  const isOver = overEstado === estado;
 
   return (
-    <div className="flex min-w-[210px] flex-1 flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+    <div
+      className={cn(
+        "flex min-w-[210px] flex-1 flex-col overflow-hidden rounded-xl border bg-white shadow-sm transition-all duration-150",
+        isOver ? "scale-[1.015] border-blue-400 shadow-lg" : "border-slate-200"
+      )}
+    >
       <div
-        className="h-1.5 shrink-0"
-        style={{ backgroundColor: accent }}
+        className="h-1.5 shrink-0 transition-colors duration-150"
+        style={{ backgroundColor: isOver ? "#2563eb" : accent }}
       />
-      <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/70 px-3 py-2.5">
+      <div
+        className={cn(
+          "flex items-center justify-between border-b px-3 py-2.5 transition-colors duration-150",
+          isOver ? "border-blue-100 bg-blue-50" : "border-slate-100 bg-slate-50/70"
+        )}
+      >
         <div className="flex items-center gap-2">
           <span className="h-2 w-2 rounded-full" style={{ backgroundColor: accent }} />
           <h2 className="text-sm font-semibold text-slate-800">{title}</h2>
@@ -44,8 +62,8 @@ export default function KanbanColumn({
       <div
         ref={setNodeRef}
         className={cn(
-          "flex flex-1 flex-col gap-2 overflow-y-auto bg-slate-50/70 p-2.5 transition-colors",
-          isOver && "bg-blue-50 ring-2 ring-inset ring-blue-300"
+          "flex flex-1 flex-col gap-2 overflow-y-auto p-2.5 transition-colors duration-150",
+          isOver ? "bg-blue-100/70 ring-4 ring-inset ring-blue-400" : "bg-slate-50/70"
         )}
       >
         {tasks.length === 0 && (

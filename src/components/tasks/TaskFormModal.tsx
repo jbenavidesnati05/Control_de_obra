@@ -22,9 +22,7 @@ import { toDateInputValue, fromDateInputValue } from "@/lib/utils";
 
 const ESTADO_LABEL: Record<string, string> = {
   POR_HACER: "Por hacer",
-  EN_ANALISIS: "En análisis",
-  EN_GESTION: "En gestión",
-  HECHA: "Hecha",
+  EN_PROCESO: "En proceso",
   CERRADA: "Cerrada",
 };
 
