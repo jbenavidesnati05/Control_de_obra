@@ -14,19 +14,13 @@ import {
   useSensor,
   useSensors,
 } from "@dnd-kit/core";
-import { Plus } from "lucide-react";
+import { Plus, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { useTasks } from "@/hooks/useTasks";
-import { deleteTask, deleteSerie, reorderTask } from "@/lib/tasks";
-import {
-  ESTADOS,
-  DISCIPLINAS,
-  TIPOS_SOLO_CALENDARIO,
-  type Disciplina,
-  type Estado,
-  type Task,
-} from "@/lib/types";
-import { disciplinaInfo } from "@/lib/disciplinas";
+import { createTask, deleteTask, reorderTask } from "@/lib/tasks";
+import { ESTADO_ACCENT, ESTADO_LABEL } from "@/lib/automatizacion";
+import { TAREAS_EJEMPLO } from "@/lib/seedData";
+import { ESTADOS, type Estado, type Prioridad, type Task } from "@/lib/types";
 import KanbanColumn from "./KanbanColumn";
 import KanbanFilters from "./KanbanFilters";
 import { KanbanCardOverlay } from "./KanbanCard";
@@ -45,53 +39,23 @@ const collisionDetectionStrategy: CollisionDetection = (args) => {
   return rectIntersection(args);
 };
 
-const ESTADO_TITLE: Record<Estado, string> = {
-  POR_HACER: "Por hacer",
-  EN_PROCESO: "En proceso",
-  CERRADA: "Cerrada",
-};
-
-const ESTADO_ACCENT: Record<Estado, string> = {
-  POR_HACER: "#94a3b8",
-  EN_PROCESO: "#f59e0b",
-  CERRADA: "#475569",
-};
-
 export default function KanbanBoard() {
   const { tasks, loading, error } = useTasks();
-  const [disciplinaFiltro, setDisciplinaFiltro] = useState<Disciplina | null>(null);
-  const [responsableFiltro, setResponsableFiltro] = useState<string | null>(null);
-  const [agrupar, setAgrupar] = useState(false);
+  const [prioridadFiltro, setPrioridadFiltro] = useState<Prioridad | null>(null);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
-  const [creatingEstado, setCreatingEstado] = useState<Estado | null>(null);
+  const [creating, setCreating] = useState(false);
   const [deletingTask, setDeletingTask] = useState<Task | null>(null);
   const [activeTask, setActiveTask] = useState<Task | null>(null);
   const [overEstado, setOverEstado] = useState<Estado | null>(null);
+  const [seeding, setSeeding] = useState(false);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } })
   );
 
-  // Comités, cortes, hitos de cronograma y entregables viven en el Calendario;
-  // el Kanban es solo para tareas de trabajo por disciplina.
-  const tareasDeTrabajo = useMemo(
-    () => tasks.filter((t) => !TIPOS_SOLO_CALENDARIO.includes(t.tipo)),
-    [tasks]
-  );
-
-  const responsables = useMemo(() => {
-    const set = new Set<string>();
-    for (const t of tareasDeTrabajo) if (t.responsable) set.add(t.responsable);
-    return Array.from(set).sort();
-  }, [tareasDeTrabajo]);
-
   const filtered = useMemo(() => {
-    return tareasDeTrabajo.filter((t) => {
-      if (disciplinaFiltro && t.disciplina !== disciplinaFiltro) return false;
-      if (responsableFiltro && t.responsable !== responsableFiltro) return false;
-      return true;
-    });
-  }, [tareasDeTrabajo, disciplinaFiltro, responsableFiltro]);
+    return tasks.filter((t) => !prioridadFiltro || t.prioridad === prioridadFiltro);
+  }, [tasks, prioridadFiltro]);
 
   // Orden manual (arrastrar en el tablero) con respaldo a orden de creación
   // para tareas viejas que todavía no tienen "orden" asignado.
@@ -99,10 +63,8 @@ export default function KanbanBoard() {
     return t.orden ?? t.createdAt?.getTime() ?? 0;
   }
 
-  function tasksFor(estado: Estado, disciplina?: Disciplina) {
-    return filtered
-      .filter((t) => t.estado === estado && (disciplina ? t.disciplina === disciplina : true))
-      .sort((a, b) => ordenDe(a) - ordenDe(b));
+  function tasksFor(estado: Estado) {
+    return filtered.filter((t) => t.estado === estado).sort((a, b) => ordenDe(a) - ordenDe(b));
   }
 
   function handleDragStart(event: DragStartEvent) {
@@ -111,7 +73,7 @@ export default function KanbanBoard() {
   }
 
   // El `isOver` del useDroppable de cada columna solo es true sobre su
-  // espacio vacío, no al pasar sobre una tarjeta (que es casi toda el área
+  // espacio vacío, no al pasar sobre otra tarjeta (que es casi toda el área
   // de una columna con contenido). Por eso calculamos aquí "sobre qué
   // columna está el drag" y se lo pasamos a cada KanbanColumn para resaltarla.
   function handleDragOver(event: DragOverEvent) {
@@ -167,6 +129,20 @@ export default function KanbanBoard() {
     }
   }
 
+  async function handleSeed() {
+    setSeeding(true);
+    try {
+      for (const input of TAREAS_EJEMPLO) {
+        await createTask(input);
+      }
+      toast.success(`${TAREAS_EJEMPLO.length} tareas de ejemplo cargadas.`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "No se pudieron cargar los ejemplos.");
+    } finally {
+      setSeeding(false);
+    }
+  }
+
   async function handleConfirmDelete() {
     if (!deletingTask) return;
     const task = deletingTask;
@@ -179,30 +155,24 @@ export default function KanbanBoard() {
     }
   }
 
-  async function handleConfirmDeleteSerie() {
-    if (!deletingTask?.serieId) return;
-    const { serieId } = deletingTask;
-    setDeletingTask(null);
-    try {
-      await deleteSerie(serieId);
-      toast.success("Serie eliminada.");
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "No se pudo eliminar la serie.");
-    }
-  }
-
-  const disciplinasConTareas = agrupar
-    ? DISCIPLINAS.filter((d) => filtered.some((t) => t.disciplina === d))
-    : [];
-
   return (
     <div className="flex flex-1 flex-col min-h-0">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-4 py-3 sm:px-6">
         <h1 className="text-base font-semibold text-slate-900">Tablero de tareas</h1>
         <div className="flex items-center gap-3">
           <WeeklyScoreBadge tasks={tasks} />
+          {!loading && tasks.length === 0 && (
+            <button
+              onClick={handleSeed}
+              disabled={seeding}
+              className="flex items-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50 px-3 py-1.5 text-sm font-medium text-blue-700 hover:bg-blue-100 disabled:opacity-50"
+            >
+              <Sparkles className="h-4 w-4" />
+              {seeding ? "Cargando..." : "Cargar ejemplos"}
+            </button>
+          )}
           <button
-            onClick={() => setCreatingEstado("POR_HACER")}
+            onClick={() => setCreating(true)}
             className="flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-medium text-white shadow-sm hover:bg-blue-700"
           >
             <Plus className="h-4 w-4" />
@@ -211,15 +181,7 @@ export default function KanbanBoard() {
         </div>
       </div>
 
-      <KanbanFilters
-        disciplinaFiltro={disciplinaFiltro}
-        setDisciplinaFiltro={setDisciplinaFiltro}
-        responsables={responsables}
-        responsableFiltro={responsableFiltro}
-        setResponsableFiltro={setResponsableFiltro}
-        agrupar={agrupar}
-        setAgrupar={setAgrupar}
-      />
+      <KanbanFilters prioridadFiltro={prioridadFiltro} setPrioridadFiltro={setPrioridadFiltro} />
 
       {error && (
         <div className="mx-4 mt-3 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700 sm:mx-6">
@@ -244,69 +206,31 @@ export default function KanbanBoard() {
               setOverEstado(null);
             }}
           >
-            {agrupar ? (
-              <div className="flex flex-col gap-6">
-                {disciplinasConTareas.map((d) => {
-                  const info = disciplinaInfo(d);
-                  return (
-                    <div key={d}>
-                      <div className="mb-2 flex items-center gap-2">
-                        <span className="h-2 w-2 rounded-full" style={{ backgroundColor: info.color }} />
-                        <h3 className="text-sm font-semibold text-slate-700">{info.label}</h3>
-                      </div>
-                      <div className="mx-auto flex w-full max-w-[75%] gap-3">
-                        {ESTADOS.map((estado) => (
-                          <KanbanColumn
-                            key={estado}
-                            estado={estado}
-                            title={ESTADO_TITLE[estado]}
-                            accent={ESTADO_ACCENT[estado]}
-                            tasks={tasksFor(estado, d)}
-                            onCardClick={setEditingTask}
-                            onDeleteRequest={setDeletingTask}
-                            overEstado={overEstado}
-                          />
-                        ))}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            ) : (
-              <div className="mx-auto flex h-full w-full max-w-[75%] gap-3">
-                {ESTADOS.map((estado) => (
-                  <KanbanColumn
-                    key={estado}
-                    estado={estado}
-                    title={ESTADO_TITLE[estado]}
-                    accent={ESTADO_ACCENT[estado]}
-                    tasks={tasksFor(estado)}
-                    onCardClick={setEditingTask}
-                    onDeleteRequest={setDeletingTask}
-                    overEstado={overEstado}
-                  />
-                ))}
-              </div>
-            )}
+            <div className="mx-auto flex h-full w-full max-w-[75%] gap-3">
+              {ESTADOS.map((estado) => (
+                <KanbanColumn
+                  key={estado}
+                  estado={estado}
+                  title={ESTADO_LABEL[estado]}
+                  accent={ESTADO_ACCENT[estado]}
+                  tasks={tasksFor(estado)}
+                  onCardClick={setEditingTask}
+                  onDeleteRequest={setDeletingTask}
+                  overEstado={overEstado}
+                />
+              ))}
+            </div>
             <DragOverlay>{activeTask && <KanbanCardOverlay task={activeTask} />}</DragOverlay>
           </DndContext>
         )}
       </div>
 
       {editingTask && <TaskFormModal task={editingTask} onClose={() => setEditingTask(null)} />}
-      {creatingEstado && (
-        <TaskFormModal defaultEstado={creatingEstado} onClose={() => setCreatingEstado(null)} />
-      )}
+      {creating && <TaskFormModal onClose={() => setCreating(false)} />}
       {deletingTask && (
         <DeleteTaskDialog
           task={deletingTask}
-          serieCount={
-            deletingTask.serieId
-              ? tasks.filter((t) => t.serieId === deletingTask.serieId).length
-              : 0
-          }
-          onDeleteOne={handleConfirmDelete}
-          onDeleteSerie={handleConfirmDeleteSerie}
+          onConfirm={handleConfirmDelete}
           onCancel={() => setDeletingTask(null)}
         />
       )}

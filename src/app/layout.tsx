@@ -18,8 +18,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "ObraControl",
-  description: "Control de obra: calendario y tablero de tareas por disciplina",
+  title: "FlowBoard",
+  description: "Tablero de seguimiento de procesos de automatización (Power Automate, n8n, IA)",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

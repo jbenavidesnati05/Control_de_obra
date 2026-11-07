@@ -36,7 +36,7 @@ export default function KanbanColumn({
   return (
     <div
       className={cn(
-        "flex min-w-[210px] flex-1 flex-col overflow-hidden rounded-xl border bg-white shadow-sm transition-all duration-150",
+        "flex min-w-[250px] flex-1 flex-col overflow-hidden rounded-xl border bg-white shadow-sm transition-all duration-150",
         isOver ? "scale-[1.015] border-blue-400 shadow-lg" : "border-slate-200"
       )}
     >

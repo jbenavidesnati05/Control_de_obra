@@ -1,8 +1,8 @@
 import { startOfWeek, endOfWeek, subWeeks, isWithinInterval } from "date-fns";
 import { PUNTAJE_POR_TAREA } from "./tasks";
-import type { Task } from "./types";
+import { ESTADOS_FINALES, type Task } from "./types";
 
-const WEEK_STARTS_ON = 1; // lunes, igual que el resto del calendario
+const WEEK_STARTS_ON = 1; // lunes
 
 export interface SemanaPuntaje {
   inicio: Date;
@@ -11,8 +11,8 @@ export interface SemanaPuntaje {
   tareas: number;
 }
 
-function tareasCerradas(tasks: Task[]): Task[] {
-  return tasks.filter((t) => t.estado === "CERRADA" && t.cerradaEn);
+function procesosCompletados(tasks: Task[]): Task[] {
+  return tasks.filter((t) => ESTADOS_FINALES.includes(t.estado) && t.completadaEn);
 }
 
 function puntosDe(task: Task): number {
@@ -20,14 +20,16 @@ function puntosDe(task: Task): number {
 }
 
 // Últimas `semanas` semanas (incluida la actual), en orden cronológico, con
-// el total de puntos de tareas cerradas cuya `cerradaEn` cae en cada una.
+// el total de puntos de procesos completados cuya `completadaEn` cae en cada una.
 export function historialSemanal(tasks: Task[], semanas = 6, hoy = new Date()): SemanaPuntaje[] {
-  const cerradas = tareasCerradas(tasks);
+  const completados = procesosCompletados(tasks);
   const resultado: SemanaPuntaje[] = [];
   for (let i = semanas - 1; i >= 0; i--) {
     const inicio = startOfWeek(subWeeks(hoy, i), { weekStartsOn: WEEK_STARTS_ON });
     const fin = endOfWeek(inicio, { weekStartsOn: WEEK_STARTS_ON });
-    const deLaSemana = cerradas.filter((t) => isWithinInterval(t.cerradaEn as Date, { start: inicio, end: fin }));
+    const deLaSemana = completados.filter((t) =>
+      isWithinInterval(t.completadaEn as Date, { start: inicio, end: fin })
+    );
     resultado.push({
       inicio,
       fin,

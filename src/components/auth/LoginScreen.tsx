@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { HardHat } from "lucide-react";
+import { Bot } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
 import GoogleIcon from "./GoogleIcon";
@@ -23,12 +23,12 @@ export default function LoginScreen() {
   return (
     <div className="flex min-h-screen flex-col items-center justify-center gap-6 bg-slate-50 px-4">
       <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-600 text-white shadow-sm">
-        <HardHat className="h-7 w-7" />
+        <Bot className="h-7 w-7" />
       </div>
       <div className="text-center">
-        <h1 className="text-xl font-semibold text-slate-900">ObraControl</h1>
+        <h1 className="text-xl font-semibold text-slate-900">FlowBoard</h1>
         <p className="mt-1 text-sm text-slate-500">
-          Inicia sesión para ver tu calendario y tablero de obra.
+          Inicia sesión para ver tu tablero de automatizaciones.
         </p>
       </div>
       <button

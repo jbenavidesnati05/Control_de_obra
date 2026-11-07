@@ -2,15 +2,13 @@
 
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { AlertTriangle, CalendarDays, Clock, Repeat, Trash2, User } from "lucide-react";
+import { CalendarDays, Clock, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import DisciplinaChip from "@/components/tasks/DisciplinaChip";
-import { disciplinaInfo } from "@/lib/disciplinas";
-import { colorEstancamiento, diasSinGestion } from "@/lib/taskStatus";
-import { isPast, cn } from "@/lib/utils";
-import { RECURRENCIA_LABEL_CORTO } from "@/lib/recurrencia";
-import { ESTADOS_FINALES, type Task } from "@/lib/types";
+import { PRIORIDAD_COLOR, PRIORIDAD_LABEL } from "@/lib/automatizacion";
+import { colorEstancamiento, diasSinGestion, isVencida } from "@/lib/taskStatus";
+import { cn } from "@/lib/utils";
+import type { Task } from "@/lib/types";
 
 interface Props {
   task: Task;
@@ -22,21 +20,20 @@ interface Props {
 // tanto en la tarjeta arrastrable normal como en el DragOverlay (la copia
 // flotante que sigue al cursor durante el arrastre).
 export function KanbanCardBody({ task }: { task: Task }) {
-  const info = disciplinaInfo(task.disciplina);
-  const vencida = task.fecha && !ESTADOS_FINALES.includes(task.estado) && isPast(task.fecha);
+  const prioridad = PRIORIDAD_COLOR[task.prioridad];
+  const vencida = isVencida(task);
   const dias = diasSinGestion(task);
   const estancamiento = colorEstancamiento(task);
 
   return (
     <>
       <div className="mb-1.5 flex flex-wrap items-center gap-1 pr-5">
-        <DisciplinaChip disciplina={task.disciplina} size="xs" />
-        {task.esStopper && (
-          <span className="inline-flex items-center gap-0.5 rounded-full bg-red-50 px-1.5 py-0.5 text-[10px] font-semibold text-red-700">
-            <AlertTriangle className="h-2.5 w-2.5" />
-            STOPPER
-          </span>
-        )}
+        <span
+          className="rounded-full px-1.5 py-0.5 text-[10px] font-semibold"
+          style={{ backgroundColor: prioridad.bg, color: prioridad.text }}
+        >
+          {PRIORIDAD_LABEL[task.prioridad]}
+        </span>
         {vencida && (
           <span className="rounded-full bg-red-600 px-1.5 py-0.5 text-[10px] font-semibold text-white">
             VENCIDA
@@ -46,36 +43,24 @@ export function KanbanCardBody({ task }: { task: Task }) {
           <span
             className="inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[10px] font-semibold"
             style={{ backgroundColor: estancamiento.bg, color: estancamiento.text }}
-            title={`${dias} día${dias === 1 ? "" : "s"} sin gestionar`}
+            title={`${dias} día${dias === 1 ? "" : "s"} sin avanzar`}
           >
             <Clock className="h-2.5 w-2.5" />
             {dias}d
-          </span>
-        )}
-        {task.recurrencia && (
-          <span className="inline-flex items-center gap-0.5 rounded-full bg-indigo-50 px-1.5 py-0.5 text-[10px] font-semibold text-indigo-700">
-            <Repeat className="h-2.5 w-2.5" />
-            {RECURRENCIA_LABEL_CORTO[task.recurrencia]}
           </span>
         )}
       </div>
 
       <p className="text-sm font-medium leading-snug text-slate-900">{task.titulo}</p>
 
-      <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500">
-        {task.responsable && (
-          <span className="inline-flex items-center gap-1">
-            <User className="h-3 w-3" />
-            {task.responsable}
-          </span>
-        )}
-        {task.fecha && (
+      {task.fecha && (
+        <div className="mt-2 flex items-center gap-1 text-xs text-slate-500">
           <span className={cn("inline-flex items-center gap-1", vencida && "font-medium text-red-600")}>
             <CalendarDays className="h-3 w-3" />
             {format(task.fecha, "d MMM", { locale: es })}
           </span>
-        )}
-      </div>
+        </div>
+      )}
     </>
   );
 }
@@ -84,13 +69,13 @@ export function KanbanCardBody({ task }: { task: Task }) {
 // portada al body por dnd-kit, que no se recorta con el overflow de la
 // columna de origen y sigue al cursor con su propia sombra.
 export function KanbanCardOverlay({ task }: { task: Task }) {
-  const info = disciplinaInfo(task.disciplina);
+  const prioridad = PRIORIDAD_COLOR[task.prioridad];
   const cerrada = task.estado === "CERRADA";
   const estancamiento = colorEstancamiento(task);
   return (
     <div
       style={{
-        borderLeftColor: estancamiento?.ring ?? info.color,
+        borderLeftColor: estancamiento?.ring ?? prioridad.text,
         backgroundColor: estancamiento?.bg,
       }}
       className={cn(
@@ -107,14 +92,14 @@ export default function KanbanCard({ task, onClick, onRequestDelete }: Props) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: task.id,
   });
-  const info = disciplinaInfo(task.disciplina);
+  const prioridad = PRIORIDAD_COLOR[task.prioridad];
   const cerrada = task.estado === "CERRADA";
   const estancamiento = colorEstancamiento(task);
 
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
-    borderLeftColor: estancamiento?.ring ?? info.color,
+    borderLeftColor: estancamiento?.ring ?? prioridad.text,
     backgroundColor: estancamiento?.bg,
   };
 

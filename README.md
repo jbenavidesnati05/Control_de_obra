@@ -1,32 +1,35 @@
-# ObraControl
+# FlowBoard
 
-MVP para que un interventor de obra lleve el orden de un proyecto de
-interventoría electromecánica (remodelación de tienda retail): calendario de
-obra y tablero de tareas (Kanban) por disciplina, con datos en tiempo real
-sobre Firestore.
+Tablero Kanban simple para el día a día de un rol de automatización
+(Power Automate / n8n / IA): tareas administrativas y operativas — enviar
+un correo, pedir accesos, agendar una reunión — no seguimiento de proyectos
+de automatización como tal (eso vive en Azure DevOps). Login con Google,
+cada usuario tiene su propio tablero aislado, datos en tiempo real sobre
+Firestore.
 
 ## Stack
 
 - Next.js (App Router) + React + TypeScript
 - Tailwind CSS
-- Firebase / Firestore (SDK Web modular v9+), tiempo real con `onSnapshot`
-- `@dnd-kit` para el drag & drop del Kanban
+- Firebase Auth (Google) + Firestore (SDK Web modular v9+), tiempo real con `onSnapshot`
+- `@dnd-kit` para el drag & drop y reorden del Kanban
 - `lucide-react` para iconos
 
 ## 1. Configurar Firebase
 
 1. Crea un proyecto en [Firebase Console](https://console.firebase.google.com/).
-2. Habilita **Firestore Database** (modo producción o de prueba).
-3. En **Configuración del proyecto → Tus apps**, crea una app web y copia las
+2. Habilita **Firestore Database** (modo producción).
+3. Habilita **Authentication → Sign-in method → Google**.
+4. En **Authentication → Settings → Authorized domains**, agrega tu dominio
+   de Vercel.
+5. En **Configuración del proyecto → Tus apps**, crea una app web y copia las
    credenciales (`apiKey`, `authDomain`, `projectId`, etc.).
-4. Publica las reglas de seguridad de este repo (`firestore.rules`) desde la
-   consola de Firebase o con la CLI:
+6. Publica las reglas de seguridad de este repo (`firestore.rules`):
    ```bash
    firebase deploy --only firestore:rules
    ```
-   Las reglas del MVP dejan la colección `tasks` abierta a lectura/escritura
-   (sin login). El archivo incluye, comentado, el cambio a aplicar cuando se
-   habilite Firebase Auth en una fase posterior.
+   Cada usuario solo puede leer/escribir su propio espacio
+   (`users/{uid}/tasks`).
 
 ## 2. Variables de entorno
 
@@ -55,56 +58,46 @@ npm install
 npm run dev
 ```
 
-Abre [http://localhost:3000](http://localhost:3000) (redirige a
-`/calendario`).
+Abre [http://localhost:3000](http://localhost:3000) (redirige a `/tareas`,
+pide iniciar sesión con Google).
 
-## 4. Cargar datos de ejemplo (seed)
+## 4. Datos de ejemplo
 
-Con `.env.local` ya configurado:
-
-```bash
-npm run seed
-```
-
-Esto crea ~20 tareas repartidas por disciplina y estado, más eventos
-recurrentes típicos (comité semanal los miércoles, corte de obra quincenal,
-informe de contratistas los viernes) en la colección `tasks` de Firestore.
+No hay script de seed por línea de comandos (las reglas de Firestore exigen
+sesión, así que un script sin login no puede escribir). En su lugar, con el
+tablero vacío aparece un botón **"Cargar ejemplos"** que crea 5 tareas de
+muestra usando tu propia sesión autenticada (ver `src/lib/seedData.ts`).
 
 ## Modelo de datos
 
-Colección `tasks`, un documento por tarea/evento/solicitud:
+Colección `users/{uid}/tasks`, un documento por tarea:
 
 ```
 task {
-  titulo:       string
-  descripcion?: string
-  disciplina:   'ELECTRICO'|'HVAC'|'RCI'|'HIDROSANITARIO'|'GAS'|'RED_FRIO'
-                |'ILUMINACION'|'CIVIL'|'SEGURIDAD'|'TRANSVERSAL'
-  responsable?: string
-  estado:       'POR_HACER'|'EN_TRAMITE'|'HECHO'
-  tipo:         'TAREA'|'EVENTO'|'SOLICITUD'
-  fecha?:       Timestamp
-  esStopper:    boolean
-  notas?:       string
-  createdAt:    Timestamp (serverTimestamp)
-  updatedAt:    Timestamp (serverTimestamp)
+  titulo:        string
+  notas?:        string
+  estado:        'BACKLOG'|'ANALISIS'|'EN_PROCESO'|'CERRADA'
+  prioridad:     'ALTA'|'MEDIA'|'BAJA'
+  fecha?:        Timestamp
+  orden:         number           (posición manual dentro de la columna)
+  puntaje:       number           (50 por defecto, suma al llegar a Cerrada)
+  completadaEn?: Timestamp        (decide a qué semana se abona el puntaje)
+  createdAt:     Timestamp (serverTimestamp)
+  updatedAt:     Timestamp (serverTimestamp)
 }
 ```
-
-La misma tarea se ve en el **Calendario** (por `fecha`) y en el **Kanban**
-(por `estado`), y ambas vistas se actualizan en tiempo real vía `onSnapshot`.
 
 ## 5. Desplegar en Vercel
 
 1. Sube el repo a GitHub.
 2. En Vercel: **Import Project** desde GitHub.
 3. En **Settings → Environment Variables**, agrega las mismas claves
-   `NEXT_PUBLIC_FIREBASE_*` de tu `.env.local`.
-4. Deploy — no hay migraciones ni pooling que configurar (Firestore es
-   serverless).
-5. En Firebase Console, agrega el dominio de Vercel (`*.vercel.app` o tu
-   dominio propio) a **Authentication → Settings → Authorized domains** (útil
-   desde ya para cuando se habilite Auth) y confirma que las reglas de
+   `NEXT_PUBLIC_FIREBASE_*` de tu `.env.local` (sin marcarlas "Sensitive":
+   esas se inyectan solo en runtime, no en el build, y `NEXT_PUBLIC_*`
+   necesita estar disponible durante el build).
+4. Deploy.
+5. Confirma en Firebase Console que el dominio de Vercel esté en
+   **Authentication → Settings → Authorized domains** y que las reglas de
    Firestore estén publicadas.
 
 ## Estructura del proyecto
@@ -112,31 +105,24 @@ La misma tarea se ve en el **Calendario** (por `fecha`) y en el **Kanban**
 ```
 src/
   app/
-    calendario/page.tsx   Vista de calendario (mes/semana)
-    tareas/page.tsx        Vista de kanban
-    layout.tsx, page.tsx
+    tareas/page.tsx         Vista de kanban (única página de la app)
+    layout.tsx, page.tsx    page.tsx redirige a /tareas
   components/
-    calendar/               Grilla mensual/semanal, panel del día, leyenda
-    kanban/                 Columnas, tarjetas, filtros
-    tasks/                  Formulario de tarea (crear/editar), chip de disciplina
-    layout/                 Encabezado y navegación
-    ui/                     Primitivas (modal)
-  hooks/useTasks.ts         Suscripción en tiempo real a Firestore
+    auth/                   Login con Google, gate de autenticación
+    kanban/                 Tablero, columnas, tarjetas, filtros, puntaje semanal
+    tasks/                  Formulario de tarea (crear/editar), confirmación de borrado
+    layout/                 Encabezado
+    ui/                     Primitivas (modal, confirm dialog)
+  hooks/
+    useAuth.tsx             Sesión de Google
+    useTasks.tsx            Suscripción en tiempo real a Firestore
   lib/
-    firebase.ts             Singleton de inicialización de Firebase
-    tasks.ts                CRUD sobre la colección "tasks"
-    disciplinas.ts           Paleta y metadatos por disciplina
-    types.ts, utils.ts, calendarUtils.ts
-scripts/seed.ts             Script de datos de ejemplo
+    firebase.ts             Singleton de inicialización de Firebase (auth + firestore)
+    tasks.ts                CRUD sobre users/{uid}/tasks
+    automatizacion.ts       Labels y colores por estado/prioridad
+    taskStatus.ts           Vencida / estancamiento (días sin avanzar)
+    puntaje.ts              Agregación semanal de puntos
+    seedData.ts             5 tareas de ejemplo
+    types.ts, utils.ts
 firestore.rules
 ```
-
-## Próximas fases (terreno preparado, sin implementar)
-
-- **Firebase Auth**: multi-usuario / multi-interventor. Ver comentario en
-  `firestore.rules` con la regla a activar.
-- **Eventos recurrentes automáticos**: hoy el seed genera ocurrencias
-  puntuales; una fase futura podría generarlas dinámicamente o con Cloud
-  Functions.
-- **Alertas por correo** (tareas por vencer / vencidas).
-- **Importar cronograma desde Excel**.
