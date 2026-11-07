@@ -12,9 +12,21 @@ import {
   type QueryDocumentSnapshot,
 } from "firebase/firestore";
 import { auth, db } from "./firebase";
-import { ESTADOS_FINALES, type Estado, type Task, type TaskInput } from "./types";
+import { ESTADOS, ESTADOS_FINALES, PRIORIDADES, type Estado, type Task, type TaskInput } from "./types";
 
 export const PUNTAJE_POR_TAREA = 50;
+
+// Defensa contra datos de versiones anteriores del modelo (estados/prioridad
+// que ya no existen): sin esto, un valor desconocido llega hasta un
+// Record[valor] en la UI y revienta el render de toda la app con pantalla
+// en blanco en vez de solo esa tarea viéndose rara.
+function normalizarEstado(raw: unknown): Estado {
+  return (ESTADOS as string[]).includes(raw as string) ? (raw as Estado) : "BACKLOG";
+}
+
+function normalizarPrioridad(raw: unknown): Task["prioridad"] {
+  return (PRIORIDADES as string[]).includes(raw as string) ? (raw as Task["prioridad"]) : "MEDIA";
+}
 
 // Cada usuario tiene su propio espacio aislado: users/{uid}/tasks.
 function tasksCollection(uid: string): CollectionReference<DocumentData> {
@@ -40,8 +52,8 @@ function fromFirestore(snap: QueryDocumentSnapshot<DocumentData>): Task {
     id: snap.id,
     titulo: data.titulo,
     notas: data.notas ?? "",
-    estado: data.estado,
-    prioridad: data.prioridad ?? "MEDIA",
+    estado: normalizarEstado(data.estado),
+    prioridad: normalizarPrioridad(data.prioridad),
     fecha: data.fecha instanceof Timestamp ? data.fecha.toDate() : null,
     orden: typeof data.orden === "number" ? data.orden : undefined,
     puntaje: typeof data.puntaje === "number" ? data.puntaje : PUNTAJE_POR_TAREA,
